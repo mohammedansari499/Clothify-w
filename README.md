@@ -1,6 +1,5 @@
-﻿# Clothify AI Wardrobe System
+**﻿# Clothify AI Wardrobe System**
 
-# WardrobeAI 👕🤖
 
 AI-powered wardrobe planner that helps users organize clothing and generate outfit recommendations using image classification.
 
@@ -35,3 +34,4 @@ Infrastructure
 ---
 
 ## Project Structure
+

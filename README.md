@@ -1,109 +1,133 @@
 # Clothify – AI Wardrobe System
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
-![Flask](https://img.shields.io/badge/Flask-Backend-black)
+![Flask](https://img.shields.io/badge/Backend-Flask-black)
 ![MongoDB](https://img.shields.io/badge/Database-MongoDB-green)
 ![TensorFlow Lite](https://img.shields.io/badge/AI-TensorFlow%20Lite-orange)
+![React](https://img.shields.io/badge/Frontend-React-blue)
+![Docker](https://img.shields.io/badge/Container-Docker-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-AI-powered wardrobe planner that helps users organize clothing and generate outfit recommendations using image classification.
+Clothify is an AI-powered wardrobe management system that allows users to organize clothing items, automatically classify garments using computer vision, and generate outfit recommendations.
+
+The system combines **Flask APIs, machine learning models, and modern frontend technologies** to build a scalable wardrobe assistant.
 
 ---
 
-# Features
+# Key Features
 
-- User Authentication (JWT)
-- Clothing Image Upload
-- AI Clothing Classification
-- Wardrobe Management
-- Outfit Recommendation Engine
-- AI Color Extraction
+- User authentication using JWT
+- Clothing image upload
+- AI-powered clothing classification
+- Automatic color extraction
+- Wardrobe management system
+- Outfit recommendation engine
+- REST API architecture
 
 ---
 
 # System Architecture
 
 ```
-User Uploads Image
-        │
-        ▼
+User
+ │
+ ▼
+Frontend (React)
+ │
+ ▼
 Flask Backend API
-        │
-        ▼
-Image Preprocessing
-(OpenCV + Pillow)
-        │
-        ▼
-TensorFlow Lite Model
-        │
-        ▼
-Clothing Type Prediction
-        │
-        ▼
-Color Extraction
-        │
-        ▼
-Store Metadata in MongoDB
-        │
-        ▼
-Outfit Recommendation Engine
+ │
+ ├── Authentication Service
+ ├── Wardrobe Management
+ ├── Image Upload
+ └── AI Classification Requests
+ │
+ ▼
+AI Service
+ │
+ ├── Image Preprocessing
+ ├── TensorFlow Lite Model
+ └── Color Extraction
+ │
+ ▼
+MongoDB Database
 ```
-
----
-
-# Tech Stack
-
-## Backend
-
-- Python
-- Flask
-- MongoDB
-- TensorFlow Lite
-- OpenCV
-- NumPy
-- JWT Authentication
-
-## Frontend (Planned)
-
-- React
-- TailwindCSS
-
-## Infrastructure
-
-- Docker
-- Cloud Storage (future)
-- Stripe (future)
 
 ---
 
 # Project Structure
 
 ```
-backend
+Clothify-w
 │
-├ app
-│  ├ routes
-│  │   ├ auth_routes.py
-│  │   ├ clothes_routes.py
-│  │   ├ upload_routes.py
-│  │   ├ classify_routes.py
-│  │   └ outfit_routes.py
-│  │
-│  ├ services
-│  │   ├ classifier_service.py
-│  │   ├ image_preprocessor.py
-│  │   ├ model_loader.py
-│  │   └ outfit_service.py
-│  │
-│  ├ models
-│  │   └ user_model.py
-│  │
-│  └ config
-│      └ db.py
+├ WardrobeAI
 │
-├ uploads
-├ models
-└ app.py
+│  ├ backend
+│  │
+│  │  ├ app
+│  │  │
+│  │  │   ├ routes
+│  │  │   │   ├ auth_routes.py
+│  │  │   │   ├ clothes_routes.py
+│  │  │   │   ├ upload_routes.py
+│  │  │   │   ├ classify_routes.py
+│  │  │   │   └ outfit_routes.py
+│  │  │   │
+│  │  │   ├ services
+│  │  │   │   ├ classifier_service.py
+│  │  │   │   ├ image_preprocessor.py
+│  │  │   │   ├ model_loader.py
+│  │  │   │   └ outfit_service.py
+│  │  │   │
+│  │  │   ├ models
+│  │  │   │   └ user_model.py
+│  │  │   │
+│  │  │   ├ config
+│  │  │   │   └ db.py
+│  │  │   │
+│  │  │   └ utils
+│  │  │
+│  │  ├ uploads
+│  │  ├ models
+│  │  ├ tests
+│  │  └ app.py
+│  │
+│  ├ frontend
+│  │
+│  │  ├ src
+│  │  │   ├ components
+│  │  │   ├ pages
+│  │  │   ├ services
+│  │  │   ├ hooks
+│  │  │   └ App.jsx
+│  │  │
+│  │  ├ public
+│  │  └ package.json
+│  │
+│  ├ ai-service
+│  │
+│  │  ├ models
+│  │  │   └ clothing_classifier.tflite
+│  │  │
+│  │  ├ preprocessing
+│  │  ├ inference
+│  │  └ api
+│  │
+│  ├ infrastructure
+│  │
+│  │  ├ docker
+│  │  │   ├ Dockerfile.backend
+│  │  │   └ Dockerfile.ai
+│  │  │
+│  │  └ docker-compose.yml
+│  │
+│  ├ docs
+│  │
+│  │  ├ architecture
+│  │  ├ api
+│  │  └ images
+│  │
+│  └ README.md
 ```
 
 ---
@@ -178,9 +202,9 @@ http://127.0.0.1:5000
 
 | Method | Endpoint | Description |
 |------|------|------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login user |
-| GET | `/api/auth/profile` | Get user profile |
+| POST | /api/auth/register | Register user |
+| POST | /api/auth/login | Login user |
+| GET | /api/auth/profile | Get profile |
 
 ---
 
@@ -188,9 +212,9 @@ http://127.0.0.1:5000
 
 | Method | Endpoint | Description |
 |------|------|------|
-| POST | `/api/clothes` | Add clothing item |
-| GET | `/api/clothes` | Get wardrobe |
-| DELETE | `/api/clothes/<id>` | Delete clothing |
+| POST | /api/clothes | Add clothing item |
+| GET | /api/clothes | Get wardrobe |
+| DELETE | /api/clothes/<id> | Delete clothing |
 
 ---
 
@@ -198,8 +222,8 @@ http://127.0.0.1:5000
 
 | Method | Endpoint | Description |
 |------|------|------|
-| POST | `/api/upload` | Upload clothing image |
-| POST | `/api/classify` | Run AI classification |
+| POST | /api/upload | Upload clothing image |
+| POST | /api/classify | Classify clothing |
 
 ---
 
@@ -212,45 +236,90 @@ Resize Image
       ↓
 Normalize Pixels
       ↓
-Run TensorFlow Lite Model
+TensorFlow Lite Model
       ↓
-Predict Clothing Category
+Clothing Category Prediction
       ↓
-Extract Dominant Colors
+Dominant Color Extraction
       ↓
-Save Clothing Metadata
+Save Metadata in Database
 ```
+
+---
+
+# Implementation Roadmap
+
+## Phase 1 – Backend Core (Completed)
+
+- Flask API
+- JWT authentication
+- MongoDB integration
+- Wardrobe CRUD operations
+- Image upload system
+
+---
+
+## Phase 2 – AI Integration (Completed)
+
+- TensorFlow Lite model loader
+- Image preprocessing
+- Clothing classification
+- Color extraction
+
+---
+
+## Phase 3 – Frontend (Planned)
+
+The React frontend will include:
+
+- User authentication UI
+- Wardrobe dashboard
+- Clothing upload interface
+- Outfit planner interface
+
+---
+
+## Phase 4 – AI Service (Planned)
+
+The AI service will be separated from the backend to allow scalable inference.
+
+Planned modules:
+
+- model serving API
+- GPU inference support
+- model versioning
+- asynchronous prediction queue
+
+---
+
+## Phase 5 – Infrastructure (Planned)
+
+- Docker containerization
+- Docker Compose orchestration
+- CI/CD pipeline
+- cloud deployment
+
+---
+
+## Phase 6 – Advanced Features (Planned)
+
+- Outfit recommendation algorithm
+- Google Calendar integration
+- Stripe subscription system
+- mobile application
 
 ---
 
 # Screenshots
 
-(Add screenshots later)
-
-```
-docs/images/upload.png
-docs/images/api-test.png
-docs/images/classification.png
-```
+Screenshots will be added in the `docs/images` folder.
 
 Example:
 
 ```
-![Upload](docs/images/upload.png)
+docs/images/upload.png
+docs/images/classification.png
 ```
-
----
-
-# Roadmap
-
-Future improvements planned:
-
-- Advanced outfit recommendation algorithm
-- Google Calendar integration
-- Stripe subscription system
-- Mobile application
-- Cloud image storage
-- Personalized style suggestions
 
 ---
 
@@ -263,6 +332,6 @@ https://github.com/mohammedansari499
 
 ---
 
-# Support
+# License
 
-If you like this project, consider giving it a star on GitHub.
+This project is licensed under the MIT License.

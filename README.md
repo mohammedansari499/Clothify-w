@@ -1,4 +1,10 @@
-# Clothify – AI Wardrobe System 👕🤖
+# Clothify – AI Wardrobe System
+
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Flask](https://img.shields.io/badge/Flask-Backend-black)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-green)
+![TensorFlow Lite](https://img.shields.io/badge/AI-TensorFlow%20Lite-orange)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
 AI-powered wardrobe planner that helps users organize clothing and generate outfit recommendations using image classification.
 
@@ -11,24 +17,62 @@ AI-powered wardrobe planner that helps users organize clothing and generate outf
 - AI Clothing Classification
 - Wardrobe Management
 - Outfit Recommendation Engine
+- AI Color Extraction
+
+---
+
+# System Architecture
+
+```
+User Uploads Image
+        │
+        ▼
+Flask Backend API
+        │
+        ▼
+Image Preprocessing
+(OpenCV + Pillow)
+        │
+        ▼
+TensorFlow Lite Model
+        │
+        ▼
+Clothing Type Prediction
+        │
+        ▼
+Color Extraction
+        │
+        ▼
+Store Metadata in MongoDB
+        │
+        ▼
+Outfit Recommendation Engine
+```
 
 ---
 
 # Tech Stack
 
 ## Backend
+
 - Python
 - Flask
 - MongoDB
 - TensorFlow Lite
 - OpenCV
+- NumPy
+- JWT Authentication
 
-## Frontend
-- React (planned)
+## Frontend (Planned)
+
+- React
+- TailwindCSS
 
 ## Infrastructure
+
 - Docker
-- Cloud Storage (planned)
+- Cloud Storage (future)
+- Stripe (future)
 
 ---
 
@@ -39,9 +83,23 @@ backend
 │
 ├ app
 │  ├ routes
+│  │   ├ auth_routes.py
+│  │   ├ clothes_routes.py
+│  │   ├ upload_routes.py
+│  │   ├ classify_routes.py
+│  │   └ outfit_routes.py
+│  │
 │  ├ services
+│  │   ├ classifier_service.py
+│  │   ├ image_preprocessor.py
+│  │   ├ model_loader.py
+│  │   └ outfit_service.py
+│  │
 │  ├ models
+│  │   └ user_model.py
+│  │
 │  └ config
+│      └ db.py
 │
 ├ uploads
 ├ models
@@ -58,11 +116,15 @@ backend
 git clone https://github.com/mohammedansari499/Clothify-w.git
 ```
 
+---
+
 ## Navigate to Backend
 
 ```
 cd WardrobeAI/backend
 ```
+
+---
 
 ## Create Virtual Environment
 
@@ -70,11 +132,23 @@ cd WardrobeAI/backend
 python -m venv venv
 ```
 
-## Activate Environment (Windows)
+---
+
+## Activate Virtual Environment
+
+Windows
 
 ```
 venv\Scripts\activate
 ```
+
+Linux / Mac
+
+```
+source venv/bin/activate
+```
+
+---
 
 ## Install Dependencies
 
@@ -82,13 +156,15 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+---
+
 ## Run Server
 
 ```
 python app.py
 ```
 
-Server runs at:
+Server will start at:
 
 ```
 http://127.0.0.1:5000
@@ -100,29 +176,30 @@ http://127.0.0.1:5000
 
 ## Authentication
 
-POST `/api/auth/register`
-
-POST `/api/auth/login`
-
-GET `/api/auth/profile`
+| Method | Endpoint | Description |
+|------|------|------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login user |
+| GET | `/api/auth/profile` | Get user profile |
 
 ---
 
 ## Wardrobe
 
-POST `/api/clothes`
-
-GET `/api/clothes`
-
-DELETE `/api/clothes/<id>`
+| Method | Endpoint | Description |
+|------|------|------|
+| POST | `/api/clothes` | Add clothing item |
+| GET | `/api/clothes` | Get wardrobe |
+| DELETE | `/api/clothes/<id>` | Delete clothing |
 
 ---
 
 ## Image Processing
 
-POST `/api/upload`
-
-POST `/api/classify`
+| Method | Endpoint | Description |
+|------|------|------|
+| POST | `/api/upload` | Upload clothing image |
+| POST | `/api/classify` | Run AI classification |
 
 ---
 
@@ -131,25 +208,49 @@ POST `/api/classify`
 ```
 Upload Image
       ↓
-Preprocess Image
+Resize Image
+      ↓
+Normalize Pixels
       ↓
 Run TensorFlow Lite Model
       ↓
-Extract Colors
+Predict Clothing Category
       ↓
-Predict Clothing Type
+Extract Dominant Colors
       ↓
-Store Metadata
+Save Clothing Metadata
 ```
 
 ---
 
-# Future Improvements
+# Screenshots
 
-- Outfit recommendation algorithm
+(Add screenshots later)
+
+```
+docs/images/upload.png
+docs/images/api-test.png
+docs/images/classification.png
+```
+
+Example:
+
+```
+![Upload](docs/images/upload.png)
+```
+
+---
+
+# Roadmap
+
+Future improvements planned:
+
+- Advanced outfit recommendation algorithm
 - Google Calendar integration
 - Stripe subscription system
-- Mobile app
+- Mobile application
+- Cloud image storage
+- Personalized style suggestions
 
 ---
 
@@ -157,5 +258,11 @@ Store Metadata
 
 Mohammed Abdul Wahaj Ansari
 
-GitHub:  
+GitHub  
 https://github.com/mohammedansari499
+
+---
+
+# Support
+
+If you like this project, consider giving it a star on GitHub.

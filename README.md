@@ -1,11 +1,10 @@
-﻿# **Clothify AI Wardrobe System**
-
+# Clothify – AI Wardrobe System 👕🤖
 
 AI-powered wardrobe planner that helps users organize clothing and generate outfit recommendations using image classification.
 
 ---
 
-## Features
+# Features
 
 - User Authentication (JWT)
 - Clothing Image Upload
@@ -15,92 +14,91 @@ AI-powered wardrobe planner that helps users organize clothing and generate outf
 
 ---
 
-## Tech Stack
+# Tech Stack
 
-Backend
+## Backend
 - Python
 - Flask
 - MongoDB
 - TensorFlow Lite
 - OpenCV
 
-Frontend
+## Frontend
 - React (planned)
 
-Infrastructure
+## Infrastructure
 - Docker
 - Cloud Storage (planned)
 
 ---
 
-## Project Structure
+# Project Structure
 
+```
 backend
 │
 ├ app
-│ ├ routes
-│ ├ services
-│ ├ models
-│ └ config
+│  ├ routes
+│  ├ services
+│  ├ models
+│  └ config
 │
 ├ uploads
 ├ models
 └ app.py
-
+```
 
 ---
 
-## Installation
+# Installation
 
-### Clone Repository
+## Clone Repository
 
-
+```
 git clone https://github.com/mohammedansari499/Clothify-w.git
+```
 
+## Navigate to Backend
 
-### Navigate to Backend
-
-
+```
 cd WardrobeAI/backend
+```
 
+## Create Virtual Environment
 
-### Create Virtual Environment
-
-
+```
 python -m venv venv
+```
 
+## Activate Environment (Windows)
 
-### Activate Environment
-
-Windows
-
-
+```
 venv\Scripts\activate
+```
 
+## Install Dependencies
 
-### Install Dependencies
-
-
+```
 pip install -r requirements.txt
+```
 
+## Run Server
 
-### Run Server
-
-
+```
 python app.py
-
+```
 
 Server runs at:
 
-
+```
 http://127.0.0.1:5000
-
+```
 
 ---
 
-## API Endpoints
+# API Endpoints
 
-### Authentication
+## Authentication
 
 POST `/api/auth/register`
 
@@ -110,7 +108,7 @@ GET `/api/auth/profile`
 
 ---
 
-### Wardrobe
+## Wardrobe
 
 POST `/api/clothes`
 
@@ -120,7 +118,7 @@ DELETE `/api/clothes/<id>`
 
 ---
 
-### Image Processing
+## Image Processing
 
 POST `/api/upload`
 
@@ -128,25 +126,25 @@ POST `/api/classify`
 
 ---
 
-## AI Pipeline
+# AI Pipeline
 
-
+```
 Upload Image
-↓
+      ↓
 Preprocess Image
-↓
+      ↓
 Run TensorFlow Lite Model
-↓
+      ↓
 Extract Colors
-↓
+      ↓
 Predict Clothing Type
-↓
+      ↓
 Store Metadata
-
+```
 
 ---
 
-## Future Improvements
+# Future Improvements
 
 - Outfit recommendation algorithm
 - Google Calendar integration
@@ -155,10 +153,9 @@ Store Metadata
 
 ---
 
-## Author
+# Author
 
 Mohammed Abdul Wahaj Ansari
 
-GitHub:
+GitHub:  
 https://github.com/mohammedansari499
-

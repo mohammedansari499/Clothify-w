@@ -8,6 +8,7 @@ __pycache__/
 
 # Uploads
 backend/uploads/
+uploads/
 
 # OS files
 .DS_Store

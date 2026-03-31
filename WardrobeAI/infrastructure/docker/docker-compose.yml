@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────
+# WardrobeAI — Local Development Stack
+# ─────────────────────────────────────────────────────
+# Usage:
+#   docker-compose up --build        (start all services)
+#   docker-compose up -d             (start in background)
+#   docker-compose down              (stop all services)
+#   docker-compose logs -f backend   (tail backend logs)
+
+version: "3.9"
+
+services:
+  # ── MongoDB ──────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: wardrobeai-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: wardrobeai
+      MONGO_INITDB_ROOT_PASSWORD: devpass123
+      MONGO_INITDB_DATABASE: wardrobeai
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - wardrobeai-net
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Flask Backend ────────────────────────────────
+  backend:
+    build:
+      context: ../../WardrobeAI/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.backend
+    container_name: wardrobeai-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      MONGO_URI: mongodb://wardrobeai:devpass123@mongodb:27017/wardrobeai?authSource=admin
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
+      FLASK_ENV: development
+      FRONTEND_URL: http://localhost:5173
+      # Add other env vars as needed
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ../../WardrobeAI/backend:/app
+    networks:
+      - wardrobeai-net
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  wardrobeai-net:
+    driver: bridge

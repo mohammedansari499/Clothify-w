@@ -22,3 +22,20 @@ node_modules/
 
 # Logs
 *.log
+
+# Test coverage
+coverage-report/
+htmlcov/
+.coverage
+*.cover
+
+# Docker
+mongo_data/
+
+# Build outputs
+dist/
+build/
+
+# Misc
+*.egg-info/
+.pytest_cache/

@@ -29,5 +29,5 @@ def upload_image():
 
     return jsonify({
         "message": "File uploaded successfully",
-        "image_url": upload_path
+        "image_url": f"http://127.0.0.1:5000/uploads/{filename}"
     })

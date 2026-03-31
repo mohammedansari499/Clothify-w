@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime
-from app.config.db import clothes_collection
+import app.config.db as db
 
 clothes = Blueprint("clothes", __name__)
 
@@ -32,7 +32,7 @@ def add_clothing():
         "created_at": datetime.utcnow()
     }
 
-    result = clothes_collection.insert_one(clothing_item)
+    result = db.clothes_collection.insert_one(clothing_item)
 
     return jsonify({
         "message": "Clothing item added",
@@ -46,7 +46,7 @@ def get_clothes():
 
     user_id = get_jwt_identity()
 
-    items = clothes_collection.find({"user_id": user_id})
+    items = db.clothes_collection.find({"user_id": user_id})
 
     clothes_list = []
 
@@ -63,7 +63,7 @@ def delete_clothing(id):
 
     user_id = get_jwt_identity()
 
-    result = clothes_collection.delete_one({
+    result = db.clothes_collection.delete_one({
         "_id": ObjectId(id),
         "user_id": user_id
     })
@@ -72,3 +72,37 @@ def delete_clothing(id):
         return jsonify({"error": "Item not found"}), 404
 
     return jsonify({"message": "Item deleted"})
+
+
+@clothes.route("/<id>/wear", methods=["PATCH"])
+@jwt_required()
+def mark_worn(id):
+    """Increment wear count and set last_worn date."""
+    user_id = get_jwt_identity()
+
+    result = db.clothes_collection.update_one(
+        {"_id": ObjectId(id), "user_id": user_id},
+        {"$inc": {"wear_count": 1}, "$set": {"last_worn": datetime.utcnow().isoformat()}}
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Item not found"}), 404
+
+    return jsonify({"message": "Wear count updated"})
+
+
+@clothes.route("/<id>/reset-wear", methods=["PATCH"])
+@jwt_required()
+def reset_worn(id):
+    """Reset wear count to 0."""
+    user_id = get_jwt_identity()
+
+    result = db.clothes_collection.update_one(
+        {"_id": ObjectId(id), "user_id": user_id},
+        {"$set": {"wear_count": 0, "last_worn": None}}
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Item not found"}), 404
+
+    return jsonify({"message": "Wear count reset"})

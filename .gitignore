@@ -40,3 +40,10 @@ build/
 # Misc
 *.egg-info/
 .pytest_cache/
+
+# Google Calendar Credentials
+credentials.json
+token.json
+backend/credentials.json
+backend/token.json
+*.env.*

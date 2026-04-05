@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 
@@ -16,7 +16,7 @@ def generate_plan():
 
     clothes = list(db.clothes_collection.find({"user_id": user_id}))
 
-    return jsonify(outfits)
+    return jsonify(generate_outfits(clothes))
 
 
 @outfits.route("/plan/save", methods=["POST"])

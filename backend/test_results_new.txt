@@ -1,0 +1,12 @@
+IMAGE | TYPE | CONF | COLOR | RGB
+------|------|------|-------|----
+blue_t_shirt.jpg | tshirt | 72% | Royal Blue | [59, 100, 204]
+black_jeans.jpg | jeans | 61% | Silver | [151, 141, 150]
+red_jacket.jpg | shirt | 46% | Red | [112, 24, 34]
+white_shirt.webp | shirt | 99% | Off-White | [208, 207, 214]
+dark_blue_shirt.webp | shirt | 32% | Navy | [31, 45, 82]
+yellow_shirt.webp | shirt | 94% | Orange | [206, 138, 52]
+grey_turtleneck.jpg | sweater | 40% | Gray | [109, 108, 106]
+dark_blue_jeans.jpg | jeans | 100% | Navy | [25, 38, 72]
+black_pant.webp | formal_pants | 86% | Black | [27, 27, 25]
+t_shirt.webp | accessories | 37% | Lavender | [215, 190, 245]

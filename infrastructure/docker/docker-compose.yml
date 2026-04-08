@@ -34,7 +34,7 @@ services:
   # ── Flask Backend ────────────────────────────────
   backend:
     build:
-      context: ../../WardrobeAI/backend
+      context: ../../backend
       dockerfile: ../../infrastructure/docker/Dockerfile.backend
     container_name: wardrobeai-backend
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
       mongodb:
         condition: service_healthy
     volumes:
-      - ../../WardrobeAI/backend:/app
+      - ../../backend:/app
     networks:
       - wardrobeai-net
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
+import { Shirt } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export default function Login() {
   const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const hasGoogleAuth = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,70 +41,105 @@ export default function Login() {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white/[0.02] backdrop-blur-2xl p-8 rounded-3xl border border-white/5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2" />
-        <h2 className="text-3xl font-black mb-2 tracking-tight">Welcome Back</h2>
-        <p className="text-gray-400 mb-8 font-inter">Sign in to Clothify below</p>
+    <div className="flex-1 flex items-center justify-center px-4 py-20 bg-darker relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] -z-10 animate-pulse-slow" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10 animate-pulse-slow" style={{ animationDelay: '2s' }} />
 
-        {error && (
-          <div className="p-3 mb-6 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
-            <input 
-              type="email" 
-              required
-              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary/50 text-white transition-all font-inter"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
-            <input 
-              type="password" 
-              required
-              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary/50 text-white transition-all font-inter"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
+      <div className="w-full max-w-md bg-card/40 backdrop-blur-2xl p-10 rounded-[2rem] border border-border-subtle shadow-2xl relative overflow-hidden group">
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+        
+        <div className="relative z-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-8 border border-primary/20">
+            <Shirt className="w-8 h-8 text-primary" />
           </div>
           
-          <button 
-            disabled={loading}
-            className="w-full py-4 bg-primary text-darker font-bold rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 mt-6 shadow-[0_0_20px_-5px] shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+          <h2 className="text-4xl font-black mb-3 tracking-tighter text-text">Welcome Back</h2>
+          <p className="text-text-muted mb-10 font-medium">Elevate your style with Clothify.</p>
 
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex-1 border-t border-white/10" />
-          <span className="text-xs text-gray-500 uppercase tracking-wider">or</span>
-          <div className="flex-1 border-t border-white/10" />
+          {error && (
+            <div className="p-4 mb-8 bg-error/10 border border-error/20 text-error rounded-2xl text-sm font-medium animate-shake">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-text-muted ml-1 uppercase tracking-widest">Email Address</label>
+              <div className="relative group">
+                <input 
+                  type="email" 
+                  required
+                  className="w-full px-6 py-4 bg-darker/50 border border-border-subtle rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-text placeholder:text-text-muted/50 transition-all font-medium"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-bold text-text-muted ml-1 uppercase tracking-widest">Password</label>
+                <Link to="#" className="text-xs font-bold text-primary hover:text-primary-hover transition-colors">Forgot Password?</Link>
+              </div>
+              <div className="relative group">
+                <input 
+                  type="password" 
+                  required
+                  className="w-full px-6 py-4 bg-darker/50 border border-border-subtle rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-text placeholder:text-text-muted/50 transition-all font-medium"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+            
+            <button 
+              disabled={loading}
+              className="w-full py-4.5 bg-primary text-darker font-black text-lg rounded-2xl hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-50 mt-8 shadow-lg shadow-primary/20 hover:shadow-primary/40 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <div className="w-6 h-6 border-3 border-darker/30 border-t-darker rounded-full animate-spin" />
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          {hasGoogleAuth && (
+            <>
+              <div className="mt-10 flex items-center gap-4">
+                <div className="flex-1 h-px bg-border-subtle" />
+                <span className="text-[10px] font-black text-text-muted/50 uppercase tracking-[0.2em]">or continue with</span>
+                <div className="flex-1 h-px bg-border-subtle" />
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <div className="w-full relative theme-google-login">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setError('Google login failed')}
+                    theme="outline"
+                    size="large"
+                    shape="pill"
+                    width="100%"
+                    text="signin_with"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          {!hasGoogleAuth && (
+            <div className="mt-6 text-xs text-text-muted/70">
+              Google sign-in is disabled until <code>VITE_GOOGLE_CLIENT_ID</code> is set.
+            </div>
+          )}
+
+          <p className="mt-10 text-center text-sm font-medium text-text-muted">
+            New to Clothify? <Link to="/register" className="text-primary font-bold hover:underline decoration-2 underline-offset-4">Create account</Link>
+          </p>
         </div>
-
-        <div className="mt-6 flex justify-center">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Google login failed')}
-            theme="filled_black"
-            size="large"
-            width="100%"
-            text="signin_with"
-          />
-        </div>
-
-        <p className="mt-6 text-center text-sm text-gray-400">
-          Don't have an account? <Link to="/register" className="text-primary hover:underline">Register here</Link>
-        </p>
       </div>
     </div>
   );

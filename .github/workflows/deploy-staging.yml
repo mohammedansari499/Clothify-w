@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: WardrobeAI/frontend
+        working-directory: frontend
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: WardrobeAI/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Vercel CLI
         run: npm i -g vercel@latest

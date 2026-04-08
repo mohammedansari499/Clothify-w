@@ -8,13 +8,21 @@ No API keys, no fallback heuristics, no network calls.
 If a fine-tuned model exists at weights/clothing_classifier.pt, it is loaded
 instead for higher accuracy.
 """
-import torch
-import torch.nn as nn
-from torchvision import transforms, models
-from PIL import Image
 import json
 import logging
 from pathlib import Path
+
+try:
+    import torch
+    from PIL import Image
+    from torchvision import models, transforms
+    _ML_STACK_AVAILABLE = True
+except Exception:  # pragma: no cover - environment dependent
+    torch = None
+    Image = None
+    models = None
+    transforms = None
+    _ML_STACK_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +30,7 @@ logger = logging.getLogger(__name__)
 IMG_SIZE = 224
 MEAN = [0.485, 0.456, 0.406]   # ImageNet normalization
 STD = [0.229, 0.224, 0.225]
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("cpu") if torch is not None else None
 CONF_THRESH = 0.15  # Lower threshold for ImageNet zero-shot (multi-class)
 
 WEIGHTS_DIR = Path(__file__).parent / "weights"
@@ -113,6 +121,12 @@ LABEL_KEYWORDS_ORDERED = [
     # ── Bottoms ──
     ("jean", "jeans"),
     ("denim", "jeans"),
+    ("cargo", "cargo_pants"),
+    ("utility pants", "cargo_pants"),
+    ("pocketed pants", "cargo_pants"),
+    ("sweatpants", "track_pants"),
+    ("jogger", "track_pants"),
+    ("track pants", "track_pants"),
     ("trouser", "formal_pants"),
     ("slack", "formal_pants"),
     ("short", "shorts"),
@@ -142,16 +156,30 @@ LABEL_KEYWORDS_ORDERED = [
     # ── Accessories ──
     ("sunglasses", "accessories"),
     ("sunglass", "accessories"),
+    ("eyewear", "accessories"),
     ("stethoscope", "accessories"),
     ("backpack", "bag"),
+    ("handbag", "bag"),
+    ("purse", "bag"),
     ("bag", "bag"),
     ("watch", "watch"),
     ("clock", "watch"),
+    ("belt", "belt"),
+    ("band", "belt"),
+    ("ring", "ring"),
+    ("chain", "chain"),
+    ("necklace", "chain"),
+    ("bracelet", "bracelet"),
+    ("wristband", "bracelet"),
     ("tie", "tie"),                  # Generic tie — after specific ties above
     ("stole", "scarf"),
     ("scarf", "scarf"),
     ("bib", "accessories"),
     ("apron", "accessories"),
+    # ── Traditional / Ethnic ──
+    ("kurta", "kurta"),
+    ("tunic", "kurta"),
+    ("sherwani", "sherwani"),
     # ── Sportswear ──
     ("swimming", "sportswear"),
     # ── Skip these ──
@@ -170,7 +198,7 @@ STYLE_MAP = {
     "jacket": "casual", "hoodie": "casual", "sweater": "casual",
     "kurta": "traditional", "sherwani": "traditional",
     "jeans": "casual", "formal_pants": "formal", "cargo_pants": "casual",
-    "shorts": "casual", "track_pants": "casual", "pyjama": "casual",
+    "track_pants": "casual", "shorts": "casual", "pyjama": "casual",
     "dress": "semi-formal", "skirt": "semi-formal",
     "sneakers": "casual", "loafers": "semi-formal", "shoes": "formal",
     "sandals": "casual", "slippers": "casual",
@@ -186,20 +214,39 @@ STYLE_MAP = {
 _model = None
 _custom_model = False
 _class_index = None
+_model_unavailable = False
+
+
+def preload_models():
+    """Manually pre-load models to avoid lag on first request."""
+    logger.info("[classifier] Pre-loading models...")
+    _ensure_model_loaded()
+    
+    # Also pre-load the jacket verifier (CLIP)
+    try:
+        from app.ai.jacket_verifier import JacketVerifier
+        JacketVerifier.load()
+    except Exception as e:
+        logger.info(f"[classifier] Could not pre-load jacket verifier: {e}")
+    
+    logger.info("[classifier] Models pre-loaded successfully.")
 
 
 def _ensure_model_loaded():
     """Lazy-load the model on first use."""
-    global _model, _custom_model, _class_index
+    global _model, _custom_model, _class_index, _model_unavailable
 
-    if _model is not None:
+    if not _ML_STACK_AVAILABLE:
+        _model_unavailable = True
+        return
+
+    if _model is not None or _model_unavailable:
         return
 
     custom_weights = WEIGHTS_DIR / "clothing_classifier.pt"
     class_index_file = WEIGHTS_DIR / "class_index.json"
 
     if custom_weights.exists() and class_index_file.exists():
-        # Load fine-tuned TorchScript model
         logger.info("[classifier] Loading fine-tuned model from weights/")
         try:
             _model = torch.jit.load(str(custom_weights), map_location=DEVICE)
@@ -212,20 +259,26 @@ def _ensure_model_loaded():
         except Exception as e:
             logger.warning(f"[classifier] Failed to load fine-tuned model: {e}")
 
-    # Fall back to ImageNet pre-trained MobileNetV2
-    logger.info("[classifier] Loading pre-trained MobileNetV2 (ImageNet)...")
-    _model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-    _model.eval()
-    _custom_model = False
-    logger.info("[classifier] MobileNetV2 loaded. Using ImageNet label mapping.")
+    try:
+        logger.info("[classifier] Loading pre-trained MobileNetV2 (ImageNet)...")
+        _model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+        _model.eval()
+        _custom_model = False
+        logger.info("[classifier] MobileNetV2 loaded. Using ImageNet label mapping.")
+    except Exception as e:
+        logger.warning(f"[classifier] Could not load model stack: {e}")
+        _model_unavailable = True
 
 
 # ── Inference transform ───────────────────────────────────────────
-INFER_TF = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=MEAN, std=STD),
-])
+if transforms is not None:
+    INFER_TF = transforms.Compose([
+        transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=MEAN, std=STD),
+    ])
+else:
+    INFER_TF = None
 
 # Load ImageNet class labels
 _imagenet_labels = None
@@ -234,6 +287,8 @@ _imagenet_labels = None
 def _get_imagenet_labels():
     """Get ImageNet 1000 class labels from torchvision."""
     global _imagenet_labels
+    if models is None:
+        return []
     if _imagenet_labels is not None:
         return _imagenet_labels
 
@@ -269,6 +324,14 @@ def classify_image(image_path: str) -> dict:
         }
     """
     _ensure_model_loaded()
+    if _model_unavailable or _model is None or INFER_TF is None or Image is None or torch is None:
+        return {
+            "type": "unknown",
+            "confidence": 0.0,
+            "top3": [{"type": "unknown", "score": 0.0}],
+            "label": "unavailable_model_stack",
+            "style": "casual",
+        }
 
     try:
         img = Image.open(image_path).convert("RGB")

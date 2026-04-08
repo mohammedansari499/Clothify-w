@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: WardrobeAI/backend
+        working-directory: backend
 
     env:
       MONGO_URI: ${{ secrets.MONGO_URI_TEST }}
@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: WardrobeAI/backend/requirements.txt
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: |
@@ -72,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: WardrobeAI/backend/coverage-report/
+          path: backend/coverage-report/
           retention-days: 7
 
   # ──────────────────────────────────────────────
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: WardrobeAI/frontend
+        working-directory: frontend
 
     steps:
       - name: Checkout code
@@ -94,7 +94,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: WardrobeAI/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -117,7 +117,7 @@ jobs:
     if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
     defaults:
       run:
-        working-directory: WardrobeAI/backend
+        working-directory: backend
 
     env:
       MONGO_URI: ${{ secrets.MONGO_URI_TEST }}
@@ -135,7 +135,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: WardrobeAI/backend/requirements.txt
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: |

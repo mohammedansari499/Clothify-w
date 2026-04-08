@@ -1,0 +1,45 @@
+Findings
+
+Planner.jsx is still the biggest blocker: it contains raw ... placeholders, duplicated action blocks, and mismatched JSX, so the frontend does not lint or compile.
+
+calendar_routes.py is security-critical. /connect trusts a caller-supplied user_id, /callback trusts state, and the callback stores long-lived Google credentials plus the app client_secret in the user record at calendar_routes.py. Any user can bind a Google account to another user id.
+
+Backend startup is not reproducible from a clean install. classifier.py, color_extractor.py, jacket_verifier.py, and Dockerfile.backend require torch, torchvision, scikit-learn, transformers, and gunicorn, but requirements.txt does not include them. It does include unused tensorflow/keras, which adds major weight for no benefit.
+
+CI and deployment are miswired. ci.yml and docker-compose.yml point at WardrobeAI/backend and WardrobeAI/frontend, which do not exist in this repo layout, and app.py expects JWT_SECRET while CI/compose set JWT_SECRET_KEY. app.py also leaves CORS fully open and runs debug=True at app.py when started directly.
+
+Upload/classify is unsafe and deployment-hostile. upload_routes.py saves shared filenames into one folder and returns hardcoded http://127.0.0.1:5000, while classify_routes.py trusts the URL’s last path segment to decide what local file to classify. That allows collisions and wrong-image classification across users.
+
+Auth has multiple broken edge cases. auth_routes.py and auth_routes.py call .get() on request.get_json() without handling None, so empty/invalid JSON can still 500. auth_routes.py creates Google users without a password, but auth_routes.py assumes user["password"] always exists, so password login against a Google-created account will crash.
+
+The calendar flow is also functionally broken from the frontend. auth_routes.py returns user_id only for password login, AuthContext.jsx never persists it, and Planner.jsx requires it from localStorage to open calendar connect.
+
+Saved-plan weather handling is mismatched. Planner.jsx stores weatherRes.data, but weather_routes.py returns { status, weather }, so the UI later reads the wrong shape.
+
+Frontend state/config is inconsistent. main.jsx hardcodes the Google client id, App.jsx wraps a second ThemeProvider even though main.jsx already does, and AddToCollectionModal.jsx bypasses the shared axios client with hardcoded localhost URLs. Collections.jsx and AddToCollectionModal.jsx also currently fail lint.
+
+Tests are badly out of sync with the app contract. outfit_routes.py returns an object with plan and weather_context, but test_planner.py expects a raw list. conftest.py patches outfits_collection, but the app uses db.py outfit_plans_collection.
+
+Seed/dev artifacts are using the wrong schema. seed_test_data.py inserts userId, imageUrl, and category, but the live app reads user_id, image_url, and type, so the seeded data will not behave like real app data.
+
+The leftover tracked docs and artifacts are heavily stale and contradict the codebase. README.md still describes Python 3.10 and an older structure, PROJECT_OVERVIEW.md says React 18, model_works.md says ResNet-101, backend/changes_log.md says TensorFlow was removed while requirements.txt still ships it, and execution_log.md claims fixes that the current repo no longer reflects.
+
+Several tracked files are pure repo noise and should not live in the main branch: backend/test_output_recent.txt, backend/test_results_new.txt, backend/debug_imagenet_labels.txt, and the giant guide files WardrobeAI_Windows_Guide.jsx and WardrobeAI_Windows_Guide (1).jsx. The guide files import recharts, but package.json does not depend on it.
+
+There is also leftover scaffold/accessibility debt: frontend/README.md is still the default Vite template, frontend/src/App.css is unused template CSS, frontend/index.html disables zoom, and there is no backend .dockerignore, so local backend/venv can bloat future Docker builds.
+
+Repo-Wide Fix List
+
+Restore buildability first: repair Planner.jsx, remove duplicate providers, finish or remove the collection modal flow, and make frontend lint/build green.
+Secure auth and calendar: require authenticated calendar connect, stop trusting client-supplied user_id, stop storing app client_secret per user, and handle Google-created accounts cleanly.
+Normalize backend request handling: use request.get_json(silent=True) or {}, validate ObjectIds, and fail fast when required secrets/env vars are missing.
+Fix storage and media flow: generate unique upload filenames, store canonical file metadata, stop reconstructing local paths from arbitrary URLs, and derive public URLs from config instead of hardcoded localhost.
+Unify frontend API usage: route all calls through src/utils/axios.js, persist user_id where needed, fix the weather response shape, and move OAuth/client IDs into env.
+Repair tests and CI together: update test expectations to current responses, patch the right collections, stop depending on broken local venv paths, and fix workflow working directories/env names.
+Trim dependencies and container setup: add missing runtime libs, remove unused heavy packages like TensorFlow/Stripe if they’re truly gone, add a backend .dockerignore, and make Docker/CI use the real repo paths.
+Clean the repository: remove tracked generated outputs and obsolete guide/demo files, rewrite stale docs to match the current architecture, and delete leftover template files that no longer belong.
+Verification
+
+npm.cmd run lint fails today on Planner.jsx, AddToCollectionModal.jsx, Collections.jsx, AuthContext.jsx, and ThemeContext.jsx.
+npm.cmd run build also fails locally after config load because of a Tailwind native-binary/EPERM issue, so I treated the lint errors plus source review as the reliable frontend signal.
+Git confirms the stale docs/artifacts above are actually tracked; local backend/venv and frontend/node_modules are present in the workspace but are not tracked.

@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Wardrobe from './pages/Wardrobe';
 import Planner from './pages/Planner';
+import Collections from './pages/Collections';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -16,7 +17,7 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <Router>
+      <Router>
       <div className="min-h-screen flex flex-col pt-16">
         <Navbar />
         <main className="flex-1 w-full flex flex-col">
@@ -26,10 +27,11 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/wardrobe" element={<ProtectedRoute><Wardrobe /></ProtectedRoute>} />
             <Route path="/planner" element={<ProtectedRoute><Planner /></ProtectedRoute>} />
+            <Route path="/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
           </Routes>
         </main>
       </div>
-    </Router>
+      </Router>
   );
 }
 

@@ -23,12 +23,14 @@ def mock_mongo(monkeypatch):
     # Mock collections matching app/config/db.py
     mock_users = MagicMock()
     mock_clothes = MagicMock()
-    mock_outfits = MagicMock()
+    mock_outfit_plans = MagicMock()
+    mock_collections = MagicMock()
 
     mock_db.__getitem__ = MagicMock(side_effect=lambda name: {
         "users": mock_users,
         "clothes": mock_clothes,
-        "outfits": mock_outfits,
+        "outfit_plans": mock_outfit_plans,
+        "collections": mock_collections,
     }.get(name, MagicMock()))
 
     # Patch at the db module level where collections are created
@@ -36,14 +38,16 @@ def mock_mongo(monkeypatch):
     monkeypatch.setattr("app.config.db.db", mock_db)
     monkeypatch.setattr("app.config.db.users_collection", mock_users)
     monkeypatch.setattr("app.config.db.clothes_collection", mock_clothes)
-    monkeypatch.setattr("app.config.db.outfits_collection", mock_outfits)
+    monkeypatch.setattr("app.config.db.outfit_plans_collection", mock_outfit_plans)
+    monkeypatch.setattr("app.config.db.collections_collection", mock_collections)
 
     return {
         "client": mock_client,
         "db": mock_db,
         "users": mock_users,
         "clothes": mock_clothes,
-        "outfits": mock_outfits,
+        "outfit_plans": mock_outfit_plans,
+        "collections": mock_collections,
     }
 
 

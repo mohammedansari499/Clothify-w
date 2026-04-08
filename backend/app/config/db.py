@@ -7,4 +7,6 @@ db = client["wardrobeai"]
 
 users_collection = db["users"]
 clothes_collection = db["clothes"]
-outfits_collection = db["outfits"]
+
+outfit_plans_collection = db["outfit_plans"]
+collections_collection = db["collections"]

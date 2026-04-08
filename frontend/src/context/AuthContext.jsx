@@ -14,8 +14,9 @@ export const AuthProvider = ({ children }) => {
         try {
           const res = await api.get("/auth/profile");
           setUser(res.data);
-        } catch (error) {
+        } catch {
           localStorage.removeItem("token");
+          localStorage.removeItem("user_id");
         }
       }
       setLoading(false);
@@ -26,6 +27,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
     localStorage.setItem("token", res.data.token);
+    if (res.data.user_id) {
+      localStorage.setItem("user_id", res.data.user_id);
+    }
     setUser({ email });
     return res.data;
   };
@@ -36,16 +40,20 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user_id");
     setUser(null);
   };
 
   const googleLogin = async (token) => {
     const res = await api.post("/auth/google", { token });
     localStorage.setItem("token", res.data.token);
+    if (res.data.user_id) {
+      localStorage.setItem("user_id", res.data.user_id);
+    }
     try {
       const profileRes = await api.get("/auth/profile");
       setUser(profileRes.data);
-    } catch (err) {
+    } catch {
       setUser({ email: "google-user@example.com" });
     }
     return res.data;

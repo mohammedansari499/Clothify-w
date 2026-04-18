@@ -3,285 +3,475 @@ import {
   motion,
   useScroll,
   useTransform,
-  useSpring
+  useSpring,
+  AnimatePresence,
 } from 'framer-motion';
 import {
-  Zap, ArrowRight, Database, Command,
-  Layers, Palette, Terminal, Search
+  ArrowRight,
+  Sparkles,
+  Layers,
+  Palette,
+  Zap,
+  Star,
+  ShoppingBag,
+  Wind,
+  ChevronDown,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { NeuralButton, NeuralCard, NeuralBadge } from '../components/NeuralUI';
 
+/* ─── tiny utility ──────────────────────────────────── */
+function useInView(ref, threshold = 0.15) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) setVisible(true); },
+      { threshold }
+    );
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [ref, threshold]);
+  return visible;
+}
+
+/* ─── stagger container ─────────────────────────────── */
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] } },
+};
+
+/* ═══════════════════════════════════════════════════════
+   HOME PAGE
+═══════════════════════════════════════════════════════ */
 export default function Home() {
   const containerRef = useRef(null);
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ["start start", "end start"]
+    offset: ['start start', 'end start'],
   });
 
-  // 🔥 smooth physics (key upgrade)
-  const smooth = useSpring(scrollYProgress, {
-    stiffness: 90,
-    damping: 22,
-    mass: 0.35
-  });
+  const smooth = useSpring(scrollYProgress, { stiffness: 80, damping: 20, mass: 0.3 });
 
-  const heroScale = useTransform(smooth, [0, 0.2], [1, 0.95]);
-  const heroOpacity = useTransform(smooth, [0, 0.25], [1, 0]);
-  const glowY = useTransform(smooth, [0, 1], [0, -150]);
+  const heroY = useTransform(smooth, [0, 0.35], [0, -60]);
+  const heroOpacity = useTransform(smooth, [0, 0.3], [1, 0]);
+  const heroScale = useTransform(smooth, [0, 0.25], [1, 0.96]);
+  const blob1Y = useTransform(smooth, [0, 1], [0, -180]);
+  const blob2Y = useTransform(smooth, [0, 1], [0, -100]);
+
+  /* scroll-cue fades out after first scroll */
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const unsub = scrollYProgress.on('change', v => { if (v > 0.02) setScrolled(true); });
+    return unsub;
+  }, [scrollYProgress]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 w-full flex flex-col items-center bg-transparent"
-    >
+    <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-transparent overflow-x-hidden">
 
-      {/* ================= HERO ================= */}
-      <section className="relative w-full min-h-screen flex flex-col items-center justify-center pt-32 pb-24 px-4 overflow-hidden">
+      {/* ══════════════ HERO ══════════════ */}
+      <section className="relative w-full min-h-[80vh] flex flex-col items-center justify-center px-4 pt-20 pb-12 overflow-hidden">
 
-        {/* dynamic glow */}
-        <motion.div
-          style={{ y: glowY }}
-          className="absolute w-[700px] h-[700px] bg-primary/5 rounded-full blur-[140px] -z-10"
+        {/* ambient blobs (same language as Login) */}
+        <motion.div style={{ y: blob1Y }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.18, 0.28, 0.18] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[130px] -z-10 pointer-events-none"
+        />
+        <motion.div style={{ y: blob2Y }}
+          animate={{ scale: [1, 1.08, 1], opacity: [0.08, 0.18, 0.08] }}
+          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] -z-10 pointer-events-none"
         />
 
         <motion.div
-          style={{ scale: heroScale, opacity: heroOpacity }}
-          className="w-full max-w-7xl mx-auto text-center z-10"
+          style={{ y: heroY, scale: heroScale, opacity: heroOpacity }}
+          className="w-full max-w-5xl mx-auto text-center z-10"
         >
-          <h1 className="text-7xl md:text-9xl lg:text-[12rem] font-black tracking-tighter mb-6 leading-[0.85] text-text">
-            NEURAL <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-azure to-accent bg-[length:200%_auto] animate-gradient-x italic">
-              WARDROBE.
+          {/* eyebrow badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.55 }}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-card border border-border-subtle mb-10 shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[10px] font-black uppercase tracking-[0.35em] text-text-muted">
+              AI-Powered Style OS
             </span>
-          </h1>
+          </motion.div>
 
+          {/* headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-5 leading-[1] text-text"
+          >
+            Dress like<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-azure to-accent bg-[length:200%_auto] animate-gradient-x italic">
+              yourself.
+            </span>
+          </motion.h1>
+
+          {/* subhead */}
           <motion.p
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 0.85, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="text-lg md:text-2xl text-text-muted mb-16 leading-relaxed max-w-4xl mx-auto font-medium uppercase tracking-[0.15em]"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45, duration: 0.6 }}
+            className="text-sm md:text-lg text-text-muted mb-10 leading-relaxed max-w-xl mx-auto font-medium"
           >
-            Hyper-personalized style orchestration powered by recursive visual analysis.
+            Clothify learns your unique aesthetic, curates outfits from your wardrobe,
+            and helps you show up as the best version of you — every single day.
           </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          {/* CTAs */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-3"
+          >
             <Link to="/register">
               <NeuralButton variant="primary" size="lg" icon={ArrowRight}>
-                INITIALIZE CONNECTION
+                Get Started — it's free
               </NeuralButton>
             </Link>
-
             <Link to="/login">
-              <NeuralButton variant="secondary" size="lg" icon={Command}>
-                SYSTEM ACCESS
+              <NeuralButton variant="secondary" size="lg">
+                Sign In
               </NeuralButton>
             </Link>
-          </div>
+          </motion.div>
         </motion.div>
       </section>
 
-      {/* ================= INTERFACE ================= */}
-      <section className="w-full max-w-7xl mx-auto px-4 py-40">
+      {/* ══════════════ SHOWCASE CARD ══════════════ */}
+      <Section className="w-full max-w-6xl mx-auto px-4 pb-24">
         <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: 40 }}
-          whileInView={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          viewport={{ once: true }}
-          className="w-full relative group"
+          initial={{ opacity: 0, y: 50, scale: 0.97 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+          viewport={{ once: true, amount: 0.2 }}
         >
-          <NeuralCard className="overflow-hidden p-0 border-border-subtle shadow-2xl">
+          {/* card matches Login's rounded-[2.5rem] + border-border-subtle style */}
+          <div className="bg-card backdrop-blur-xl rounded-[2.5rem] border border-border-subtle shadow-[0_20px_60px_rgba(0,0,0,0.45)] overflow-hidden relative">
 
-            <div className="grid lg:grid-cols-12 min-h-[600px]">
+            {/* accent glow (same as Login) */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
 
-              {/* LEFT PANEL */}
-              <div className="lg:col-span-4 border-r border-border-subtle bg-card p-10 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 text-primary mb-12">
-                    <div className="p-2 bg-primary/10 rounded-xl">
-                      <Database className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.4em]">
-                      Metadata_Stream
-                    </span>
-                  </div>
+            <div className="grid lg:grid-cols-2 min-h-[520px]">
 
-                  <h3 className="text-4xl font-black mb-8 tracking-tight leading-none text-text">
-                    Dynamic <br />
-                    <span className="text-primary italic font-serif">
-                      Aesthetics.
-                    </span>
-                  </h3>
+              {/* left: copy */}
+              <div className="relative z-10 p-10 md:p-14 flex flex-col justify-center">
+                <NeuralBadge className="mb-6 self-start">Live Recommendation</NeuralBadge>
 
-                  {/* BENTO GRID */}
-                  <div className="grid grid-cols-2 gap-4">
+                <h2 className="text-5xl font-black tracking-tighter leading-none mb-6 text-text">
+                  Your outfit,<br />
+                  <span className="text-primary italic font-serif">decided.</span>
+                </h2>
 
-                    {/* BOX 1 */}
+                <p className="text-text-muted leading-relaxed mb-10 max-w-sm text-base font-medium">
+                  Tell us the vibe, the weather, the occasion — Clothify handles the rest,
+                  pulling from pieces you already own and love.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 mb-10">
+                  {[
+                    { label: 'Smart Matching', sub: 'Color & fabric harmony' },
+                    { label: 'Context Aware', sub: 'Weather + occasion fit' },
+                    { label: 'Your Style DNA', sub: 'Learns over time' },
+                    { label: 'Zero Waste', sub: 'Love what you own' },
+                  ].map(({ label, sub }, i) => (
                     <motion.div
+                      key={i}
                       whileHover={{ scale: 1.03, y: -2 }}
-                      transition={{ type: "spring", stiffness: 200 }}
-                      className="col-span-2 p-4 rounded-xl bg-card border border-border-subtle hover:border-primary/20 transition-all duration-300"
+                      transition={{ type: 'spring', stiffness: 220 }}
+                      className="p-4 rounded-2xl bg-card border border-border-subtle hover:border-primary/25 transition-all duration-300"
                     >
-                      <p className="text-[10px] uppercase tracking-[0.3em] text-text-muted/40 mb-2">
-                        SYSTEM
-                      </p>
-                      <p className="text-sm font-semibold text-text">
-                        Adaptive wardrobe intelligence syncing with your daily context.
-                      </p>
+                      <p className="text-xs font-black text-text mb-1">{label}</p>
+                      <p className="text-[11px] text-text-muted/60">{sub}</p>
                     </motion.div>
-
-                    {/* BOX 2 */}
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="p-4 rounded-xl bg-card border border-border-subtle hover:border-primary/20 transition-all"
-                    >
-                      <p className="text-[9px] text-text-muted/40 uppercase tracking-widest mb-2">
-                        AI CORE
-                      </p>
-                      <p className="text-xs text-text/80">
-                        Visual learning
-                      </p>
-                    </motion.div>
-
-                    {/* BOX 3 */}
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="p-4 rounded-xl bg-card border border-border-subtle hover:border-primary/20 transition-all"
-                    >
-                      <p className="text-[9px] text-text-muted/40 uppercase tracking-widest mb-2">
-                        ENGINE
-                      </p>
-                      <p className="text-xs text-text/80">
-                        Color synthesis
-                      </p>
-                    </motion.div>
-
-                    {/* BOX 4 */}
-                    <motion.div
-                      whileHover={{ scale: 1.03 }}
-                      className="col-span-2 p-4 rounded-xl bg-primary/5 border border-primary/20 hover:shadow-[0_0_25px_rgba(0,255,150,0.15)] transition-all"
-                    >
-                      <p className="text-[9px] uppercase tracking-widest text-primary mb-2">
-                        OUTPUT
-                      </p>
-                      <p className="text-sm font-semibold text-text">
-                        Real-time outfit recommendations with contextual awareness.
-                      </p>
-                    </motion.div>
-
-                  </div>
+                  ))}
                 </div>
+
+                <Link to="/register">
+                  <NeuralButton variant="primary" icon={Zap}>
+                    Build My Wardrobe
+                  </NeuralButton>
+                </Link>
               </div>
 
-              {/* RIGHT PANEL */}
-              <div className="lg:col-span-8 relative overflow-hidden bg-darker group">
-
-                {/* image with smoother zoom */}
+              {/* right: visual panel */}
+              <div className="relative overflow-hidden bg-darker rounded-r-[2.5rem]">
                 <motion.img
                   src="/uploads/wp9337752-dark-neon-wallpapers.JPG"
-                  alt="Fashion UI"
-                  className="absolute inset-0 w-full h-full object-cover opacity-60"
-                  whileHover={{ scale: 1.06 }}
-                  transition={{ duration: 1.2, ease: "easeOut" }}
+                  alt="Style preview"
+                  className="absolute inset-0 w-full h-full object-cover opacity-50"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 1.4, ease: 'easeOut' }}
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-darker via-darker/30 to-transparent" />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-darker via-darker/40 to-transparent" />
-
-                {/* HUD */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  whileHover={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="absolute top-10 right-10 flex flex-col items-end gap-3"
-                >
-                  <div className="px-4 py-2 bg-surface border border-border-subtle rounded-xl text-[10px] font-bold tracking-widest text-primary flex items-center gap-2">
-                    <Search className="w-3 h-3" />
-                    OBJ_IDENTIFIED
-                  </div>
-                </motion.div>
-
-                {/* scanning line (SMOOTHER) */}
-                <div className="absolute inset-0 pointer-events-none border border-primary/10 m-6 rounded-2xl overflow-hidden">
+                {/* scanning line */}
+                <div className="absolute inset-0 pointer-events-none border border-primary/10 m-5 rounded-2xl overflow-hidden">
                   <motion.div
                     animate={{ y: ['0%', '100%'] }}
-                    transition={{
-                      duration: 6,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    className="w-full h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent blur-sm"
+                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-full h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent blur-sm"
                   />
                 </div>
 
-                <div className="relative z-10 h-full flex flex-col justify-end p-12">
-                  <NeuralBadge className="mb-6">
-                    CORE_RECOMMENDATION
-                  </NeuralBadge>
+                {/* floating HUD chips */}
+                <div className="relative z-10 h-full flex flex-col justify-between p-8">
+                  <motion.div
+                    initial={{ opacity: 0, x: 10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                    viewport={{ once: true }}
+                    className="self-end flex flex-col gap-2 items-end"
+                  >
+                    <Chip>🌤 19°C · Casual</Chip>
+                    <Chip>Analyzing fit…</Chip>
+                  </motion.div>
 
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                    <h4 className="text-6xl font-black tracking-tighter text-text leading-none uppercase italic">
-                      CYBER_PUNK <br />
-                      NOIR <span className="text-primary">v.2</span>
-                    </h4>
-
-                    <NeuralButton variant="primary" size="lg" icon={Zap}>
-                      DEPLOY CONFIG
-                    </NeuralButton>
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.55 }}
+                    viewport={{ once: true }}
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">Recommended</p>
+                    <h3 className="text-5xl font-black tracking-tighter text-text italic leading-none">
+                      Linen<br />Summer <span className="text-primary">Edit</span>
+                    </h3>
+                  </motion.div>
                 </div>
-
               </div>
+
             </div>
-          </NeuralCard>
+          </div>
         </motion.div>
-      </section>
+      </Section>
 
-      {/* ================= FEATURES ================= */}
-      <section className="w-full py-40 border-t border-border-subtle">
-        <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-3 gap-10">
+      {/* ══════════════ HOW IT WORKS ══════════════ */}
+      <Section className="w-full max-w-6xl mx-auto px-4 pb-24">
+        <SectionLabel>How Clothify Works</SectionLabel>
+        <SectionHeading>Three steps to<br /><em>your best look.</em></SectionHeading>
 
-          <FeatureItem icon={<Layers />} title="Semantic Archetyping" />
-          <FeatureItem icon={<Palette />} title="Chroma Engineering" />
-          <FeatureItem icon={<Terminal />} title="Predictive Logic" />
+        <div className="grid md:grid-cols-3 gap-6 mt-12">
+          {[
+            {
+              num: '01',
+              icon: <ShoppingBag className="w-6 h-6" />,
+              title: 'Upload your wardrobe',
+              body: "Snap or upload photos of your clothes. Clothify catalogs every piece — colors, fabrics, fits — and organizes your closet digitally.",
+            },
+            {
+              num: '02',
+              icon: <Sparkles className="w-6 h-6" />,
+              title: 'Tell us your vibe',
+              body: "Heading to brunch? A big meeting? A first date? Describe the occasion and mood — even just a few words is enough.",
+            },
+            {
+              num: '03',
+              icon: <Star className="w-6 h-6" />,
+              title: 'Get your outfit',
+              body: "Clothify assembles a complete look from pieces you own, explains why it works, and offers alternatives if you want to switch things up.",
+            },
+          ].map(({ num, icon, title, body }, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.13, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -6 }}
+              viewport={{ once: true, amount: 0.2 }}
+            >
+              {/* same card style as Login's container */}
+              <div className="h-full bg-card backdrop-blur-xl p-8 rounded-[2rem] border border-border-subtle shadow-[0_10px_30px_rgba(0,0,0,0.35)] relative overflow-hidden group hover:border-primary/30 transition-all duration-500">
+                <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 blur-3xl rounded-full pointer-events-none group-hover:bg-primary/10 transition-all duration-700" />
 
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+                      {icon}
+                    </div>
+                    <span className="text-5xl font-black text-text-muted/10 tracking-tighter select-none">
+                      {num}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-black text-text mb-3 tracking-tight">{title}</h3>
+                  <p className="text-text-muted text-sm leading-relaxed font-medium">{body}</p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
-      </section>
+      </Section>
 
-      {/* ================= FOOTER ================= */}
-      <footer className="w-full py-20 border-t border-border-subtle text-center text-text-muted/40 text-xs tracking-widest">
-        © 2026 CLOTHIFY
+      {/* ══════════════ FEATURE ROW ══════════════ */}
+      <Section className="w-full border-t border-border-subtle py-24">
+        <div className="max-w-6xl mx-auto px-4">
+          <SectionLabel>What's inside</SectionLabel>
+          <SectionHeading>Everything you<br /><em>didn't know you needed.</em></SectionHeading>
+
+          <div className="grid md:grid-cols-3 gap-6 mt-12">
+            <FeatureCard
+              icon={<Layers />}
+              title="Style Archetypes"
+              body="Clothify maps your taste across 40+ aesthetic archetypes — from quiet luxury to coastal grandma — and keeps learning."
+            />
+            <FeatureCard
+              icon={<Palette />}
+              title="Chroma Harmony"
+              body="A color-theory engine ensures every combination you wear is balanced, intentional, and flatters your personal palette."
+            />
+            <FeatureCard
+              icon={<Wind />}
+              title="Context Intelligence"
+              body="Weather, events, and even your calendar sync with Clothify so recommendations are always relevant to your actual day."
+            />
+          </div>
+        </div>
+      </Section>
+
+      {/* ══════════════ CTA BANNER ══════════════ */}
+      <Section className="w-full max-w-6xl mx-auto px-4 pb-24">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 30 }}
+          whileInView={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+          viewport={{ once: true, amount: 0.3 }}
+          className="relative bg-card backdrop-blur-xl rounded-[2.5rem] border border-border-subtle shadow-[0_20px_60px_rgba(0,0,0,0.45)] overflow-hidden px-10 md:px-20 py-20 text-center"
+        >
+          {/* blobs inside the card */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
+          <div className="absolute bottom-0 right-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
+
+          <div className="relative z-10">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-8 border border-primary/20 shadow-inner"
+            >
+              <Sparkles className="w-8 h-8 text-primary" />
+            </motion.div>
+
+            <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-5 text-text leading-tight">
+              Ready to open<br />
+              <span className="text-primary italic">your wardrobe?</span>
+            </h2>
+
+            <p className="text-text-muted text-base md:text-lg font-medium mb-10 max-w-xl mx-auto leading-relaxed">
+              Join thousands of people who've stopped stressing about what to wear.
+              Free forever, no credit card required.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/register">
+                <NeuralButton variant="primary" size="lg">
+                  Create Free Account
+                </NeuralButton>
+              </Link>
+              <Link to="/login">
+                <NeuralButton variant="secondary" size="lg">
+                  I already have an account
+                </NeuralButton>
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      </Section>
+
+      {/* ══════════════ FOOTER ══════════════ */}
+      <footer className="w-full py-16 border-t border-border-subtle text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-text-muted/35">
+          © 2026 Clothify — wear yourself
+        </p>
       </footer>
+
     </div>
   );
 }
 
-/* ================= FEATURE ================= */
+/* ─── layout helpers ────────────────────────────────── */
 
-function FeatureItem({ icon, title }) {
+function Section({ children, className = '' }) {
+  return <section className={`w-full ${className}`}>{children}</section>;
+}
+
+function SectionLabel({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      viewport={{ once: true }}
+      className="flex items-center justify-center gap-2 mb-5"
+    >
+      <div className="h-px w-10 bg-primary/40" />
+      <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/80">
+        {children}
+      </span>
+      <div className="h-px w-10 bg-primary/40" />
+    </motion.div>
+  );
+}
+
+function SectionHeading({ children }) {
+  return (
+    <motion.h2
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      viewport={{ once: true }}
+      className="text-4xl md:text-6xl font-black tracking-tighter text-text text-center leading-tight [&_em]:text-primary [&_em]:not-italic [&_em]:italic"
+    >
+      {children}
+    </motion.h2>
+  );
+}
+
+/* floating HUD chip */
+function Chip({ children }) {
+  return (
+    <div className="px-4 py-1.5 bg-card/80 backdrop-blur border border-border-subtle rounded-full text-[10px] font-bold tracking-widest text-text-muted/80">
+      {children}
+    </div>
+  );
+}
+
+/* feature card */
+function FeatureCard({ icon, title, body }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -8 }}
+      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -6 }}
+      viewport={{ once: true, amount: 0.2 }}
       className="group"
     >
-      <NeuralCard className="p-10 border-border-subtle hover:border-primary/30 transition-all duration-500">
+      <div className="h-full bg-card backdrop-blur-xl p-8 rounded-[2rem] border border-border-subtle hover:border-primary/30 shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all duration-500 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 blur-3xl rounded-full pointer-events-none group-hover:bg-primary/10 transition-all duration-700" />
 
-        <motion.div
-          className="mb-8 text-text-muted group-hover:text-primary"
-          whileHover={{ scale: 1.15 }}
-          transition={{ type: "spring", stiffness: 200 }}
-        >
-          {icon}
-        </motion.div>
-
-        <h3 className="text-2xl font-black text-text">
-          {title}
-        </h3>
-
-      </NeuralCard>
+        <div className="relative z-10">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-7 inline-flex group-hover:scale-110 transition-transform duration-300">
+            {icon}
+          </div>
+          <h3 className="text-xl font-black text-text mb-3 tracking-tight">{title}</h3>
+          <p className="text-sm text-text-muted leading-relaxed font-medium">{body}</p>
+        </div>
+      </div>
     </motion.div>
   );
 }

@@ -16,6 +16,7 @@ export function ThemeProvider({ children }) {
     const root = window.document.documentElement;
     root.classList.remove('dark', 'light');
     root.classList.add(theme);
+    root.setAttribute('data-theme', theme);
     localStorage.setItem('clothify_theme', theme);
   }, [theme]);
 

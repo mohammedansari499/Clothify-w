@@ -1,14 +1,17 @@
+import os
 from datetime import datetime, timedelta
+import secrets
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from flask import Blueprint, current_app, jsonify, redirect, request
+from flask import Blueprint, current_app, jsonify, redirect, request, make_response
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from googleapiclient.discovery import build
 from itsdangerous import BadSignature, BadTimeSignature, URLSafeTimedSerializer
 
 import app.config.db as db
 from app.services.calendar_service import create_oauth_flow
+from app.services.outfit_service import map_event_to_occasion
 
 calendar = Blueprint("calendar", __name__)
 
@@ -24,8 +27,8 @@ def _state_serializer():
     return URLSafeTimedSerializer(secret_key=secret, salt="calendar-oauth-state")
 
 
-def _encode_state(user_id):
-    return _state_serializer().dumps({"user_id": user_id})
+def _encode_state(user_id, nonce):
+    return _state_serializer().dumps({"user_id": user_id, "nonce": nonce})
 
 
 def _decode_state(state):
@@ -47,7 +50,8 @@ def connect_calendar():
         user_id = "anonymous"
 
     flow = create_oauth_flow()
-    state = _encode_state(user_id)
+    nonce = secrets.token_urlsafe(16)
+    state = _encode_state(user_id, nonce)
 
     authorization_url, _ = flow.authorization_url(
         state=state,
@@ -55,14 +59,26 @@ def connect_calendar():
         prompt="consent",
         include_granted_scopes="true",
     )
-    return redirect(authorization_url)
+    
+    response = make_response(redirect(authorization_url))
+    response.set_cookie(
+        "oauth_state",
+        state,
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        max_age=STATE_MAX_AGE_SECONDS
+    )
+    return response
 
 
 @calendar.route("/callback", methods=["GET"])
 def oauth2callback():
     state = request.args.get("state")
-    if not state:
-        return jsonify({"error": "Missing OAuth state"}), 400
+    state_cookie = request.cookies.get("oauth_state")
+
+    if not state or not state_cookie or state != state_cookie:
+        return jsonify({"error": "Invalid or missing OAuth state"}), 400
 
     try:
         parsed = _decode_state(state)
@@ -117,3 +133,39 @@ def oauth2callback():
             200,
         )
     return "Calendar connected successfully.", 200
+
+
+@calendar.route("/events", methods=["GET"])
+def get_events():
+    verify_jwt_in_request()
+    user_id = get_jwt_identity()
+    
+    user = db.users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user or "google_credentials" not in user:
+        return jsonify({"error": "Google Calendar not connected"}), 400
+        
+    creds_data = user["google_credentials"]
+    from google.oauth2.credentials import Credentials
+    from app.services.calendar_service import fetch_upcoming_events
+    
+    credentials = Credentials(
+        token=creds_data["token"],
+        refresh_token=creds_data.get("refresh_token"),
+        token_uri=creds_data.get("token_uri"),
+        client_id=creds_data.get("client_id"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=creds_data.get("scopes")
+    )
+    
+    try:
+        events = fetch_upcoming_events(credentials)
+        
+        # Enrich events with suggested occasions
+        for event in events:
+            summary = event.get("summary", "")
+            description = event.get("description", "")
+            event["suggested_occasion"] = map_event_to_occasion(summary, description)
+            
+        return jsonify({"events": events}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch events: {str(e)}"}), 500

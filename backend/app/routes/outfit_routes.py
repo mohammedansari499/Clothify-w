@@ -47,14 +47,20 @@ def save_plan():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     plan = data.get("plan")
+    city = data.get("city")
+    occasions = data.get("occasions")
 
     if not plan:
         return jsonify({"error": "Plan data is required"}), 400
 
-    # Save the plan, overwriting any existing saved plan for this user
+    # Save the plan along with context
     db.outfit_plans_collection.update_one(
         {"user_id": user_id},
-        {"$set": {"plan": plan}},
+        {"$set": {
+            "plan": plan,
+            "city": city,
+            "occasions": occasions
+        }},
         upsert=True
     )
 
@@ -66,13 +72,16 @@ def save_plan():
 def get_saved_plan():
     user_id = get_jwt_identity()
 
-    saved_plan = db.outfit_plans_collection.find_one({"user_id": user_id})
+    saved_doc = db.outfit_plans_collection.find_one({"user_id": user_id})
 
-    if not saved_plan or "plan" not in saved_plan:
+    if not saved_doc or "plan" not in saved_doc:
         return jsonify({"plan": None})
 
-    # Return the saved plan
-    return jsonify({"plan": saved_plan["plan"]})
+    return jsonify({
+        "plan": saved_doc["plan"],
+        "city": saved_doc.get("city"),
+        "occasions": saved_doc.get("occasions")
+    })
 
 @outfits.route("/wear", methods=["POST"])
 @jwt_required()
@@ -125,16 +134,19 @@ def generate_single_day():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     
-    day = data.get("day")
+    # Accept both 'day' and 'day_index' for flexibility
+    day = data.get("day") or data.get("day_index")
     occasion = data.get("occasion")
     exclude_ids = data.get("exclude_ids", [])
     city = data.get("city")
+    weather_data = data.get("weather_data")
 
-    if not day:
-        return jsonify({"error": "Day is required"}), 400
+    if day is None:
+        return jsonify({"error": "Day identifier is required"}), 400
 
-    # Optional weather context
-    weather_data = get_weather(city) if city else None
+    # If weather_data wasn't passed directly, try to fetch it via city
+    if not weather_data and city:
+        weather_data = get_weather(city)
     
     # Get user's clothes
     clothes = list(db.clothes_collection.find({"user_id": user_id}))
@@ -142,6 +154,6 @@ def generate_single_day():
     new_outfit = generate_single_day_outfit(clothes, day, occasion, exclude_ids, weather_data)
 
     if not new_outfit:
-        return jsonify({"error": "Could not generate outfit"}), 404
+        return jsonify({"error": "Could not generate outfit. Ensure your wardrobe has enough items."}), 404
 
-    return jsonify({"outfit": new_outfit})
+    return jsonify({"day_plan": new_outfit})

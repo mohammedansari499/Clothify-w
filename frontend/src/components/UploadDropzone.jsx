@@ -46,25 +46,25 @@ export default function UploadDropzone({ onUploadSuccess }) {
     <div className="w-full">
       <div 
         {...getRootProps()} 
-        className={`w-full border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 backdrop-blur-md ${
+        className={`w-full bg-surface border border-dashed border-border-subtle rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${
           isDragActive 
             ? 'border-primary bg-primary/10 shadow-[0_0_40px_-10px_rgba(0,255,178,0.3)] scale-[1.02]' 
-            : 'border-white/20 bg-white/[0.02] hover:border-primary/50 hover:bg-white/[0.04] hover:shadow-[0_0_20px_-5px_rgba(0,255,178,0.1)]'
+            : 'hover:border-primary/50 hover:shadow-[0_0_20px_-5px_rgba(0,255,178,0.1)]'
         } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
       >
         <input {...getInputProps()} />
         {uploading ? (
           <>
             <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-            <p className="text-gray-300 font-medium text-center">AI is analyzing your clothing...</p>
+            <p className="text-text font-medium text-center">AI is analyzing your clothing...</p>
           </>
         ) : (
           <>
-            <UploadCloud className={`w-12 h-12 mb-4 transition-colors ${isDragActive ? 'text-primary' : 'text-gray-400'}`} />
-            <p className="text-gray-300 font-medium text-center mb-1">
+            <UploadCloud className={`w-12 h-12 mb-4 transition-colors ${isDragActive ? 'text-primary' : 'text-text-muted'}`} />
+            <p className="text-text font-medium text-center mb-1">
               Drag & drop a clothing image here
             </p>
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-sm text-text-muted text-center">
               or click to browse from your device
             </p>
           </>

@@ -47,6 +47,30 @@ OCCASION_STYLE_MAP = {
     "Outing": "casual",
 }
 
+def map_event_to_occasion(summary, description=""):
+    """
+    Map a calendar event title/description to a standard Clothify occasion.
+    Uses simple keyword matching for now (AI-boosted logic can be added later).
+    """
+    text = f"{summary} {description}".lower()
+    
+    mapping = {
+        "Work": ["work", "office", "meeting", "business", "corp", "interview", "presentation"],
+        "Gym": ["gym", "workout", "training", "exercise", "run", "yoga", "fitness"],
+        "Wedding": ["wedding", "shaadi", "reception", "nikah", "marriage"],
+        "Formal Event": ["formal", "gala", "dinner", "award", "ceremony"],
+        "Date": ["date", "dinner with", "movie", "romantic"],
+        "Party": ["party", "club", "birthday", "celebration", "drinks"],
+        "Casual": ["casual", "brunch", "walk", "coffee", "friends", "hangout"],
+        "Home": ["home", "chill", "relax", "stay"]
+    }
+
+    for occasion, keywords in mapping.items():
+        if any(kw in text for kw in keywords):
+            return occasion
+            
+    return "Casual"  # Fallback
+
 
 def _rgb_to_hsl(r, g, b):
     """Convert RGB (0-255) to HSL (0-360, 0-100, 0-100)."""
@@ -414,6 +438,8 @@ def generate_outfits(clothes, weather_data=None, daily_occasions=None):
                     "shoes": _serialize_item(best_shoe) if best_shoe else None,
                     "accessories": [_serialize_item(best_acc)] if best_acc else [],
                     "score": max(0, min(score, 100)),
+                    "confidenceScore": max(0, min(score, 100)),
+                    "isSuggested": score > 75,
                     "day": day,
                     "day_index": i,
                     "occasion": occasion or "Default",
@@ -513,7 +539,9 @@ def generate_single_day_outfit(clothes, day, occasion, exclude_ids=None, weather
                 "bottom": _serialize_item(bottom),
                 "shoes": _serialize_item(best_shoe) if best_shoe else None,
                 "accessories": [_serialize_item(best_acc)] if best_acc else [],
-                "score": score,
+                "score": max(0, min(score, 100)),
+                "confidenceScore": max(0, min(score, 100)),
+                "isSuggested": score > 75,
                 "day": day,
                 "occasion": occasion,
                 "suggested_style": target_style

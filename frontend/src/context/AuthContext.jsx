@@ -30,12 +30,25 @@ export const AuthProvider = ({ children }) => {
     if (res.data.user_id) {
       localStorage.setItem("user_id", res.data.user_id);
     }
-    setUser({ email });
+    // Set user from response payload
+    setUser(res.data.user || { email });
     return res.data;
   };
 
-  const register = async (email, password) => {
-    await api.post("/auth/register", { email, password });
+  const register = async (userData) => {
+    // userData contains { email, password, name, username, etc }
+    const res = await api.post("/auth/register", userData);
+    
+    // Auto-login if token is returned
+    if (res.data.token) {
+      localStorage.setItem("token", res.data.token);
+      if (res.data.user_id) {
+        localStorage.setItem("user_id", res.data.user_id);
+      }
+      setUser(res.data.user);
+    }
+    
+    return res.data;
   };
 
   const logout = () => {
@@ -59,8 +72,14 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const updateProfile = async (userData) => {
+    const res = await api.put("/auth/profile", userData);
+    setUser(res.data.user);
+    return res.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, setUser }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, setUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

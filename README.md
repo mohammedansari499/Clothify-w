@@ -235,6 +235,5 @@ GitHub: [https://github.com/mohammedansari499](https://github.com/mohammedansari
 
 ---
 
-# License
-
-This project is licensed under the MIT License.
+## 📜 License
+This project is licensed under the MIT License — see the LICENSE file for details.

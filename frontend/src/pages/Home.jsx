@@ -434,7 +434,7 @@ function SectionHeading({ children }) {
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
       viewport={{ once: true }}
-      className="text-4xl md:text-6xl font-black tracking-tighter text-text text-center leading-tight [&_em]:text-primary [&_em]:not-italic [&_em]:italic"
+      className="text-4xl md:text-6xl font-black tracking-tighter text-text text-center leading-tight [&_em]:text-primary [&_em]:italic"
     >
       {children}
     </motion.h2>

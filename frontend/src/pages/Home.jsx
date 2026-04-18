@@ -138,7 +138,7 @@ export default function Home() {
           >
             <Link to="/register">
               <NeuralButton variant="primary" size="lg" icon={ArrowRight}>
-                Get Started — it's free
+                Get Started
               </NeuralButton>
             </Link>
             <Link to="/login">
@@ -373,7 +373,6 @@ export default function Home() {
 
             <p className="text-text-muted text-base md:text-lg font-medium mb-10 max-w-xl mx-auto leading-relaxed">
               Join thousands of people who've stopped stressing about what to wear.
-              Free forever, no credit card required.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

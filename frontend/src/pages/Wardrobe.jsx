@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import api from '../utils/axios';
 import UploadDropzone from '../components/UploadDropzone';
-import { 
-  Trash2, Eye, RotateCcw, Filter, Search, 
+import {
+  Trash2, Eye, RotateCcw, Filter, Search,
   Grid, List as ListIcon, Plus, ChevronDown,
   Info, Sparkles, Shirt, Layers, Palette
 } from 'lucide-react';
@@ -29,7 +29,7 @@ const CATEGORY_CONFIG = {
   skirt: { label: 'Skirts', icon: <Palette className="w-4 h-4" />, group: 'Dresses' },
   sneakers: { label: 'Sneakers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   shoes: { label: 'Shoes', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
-  loafers: { label: 'Loafers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
+  loafers: { label: 'Shoes', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   sandals: { label: 'Sandals', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   slippers: { label: 'Slippers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   watch: { label: 'Watches', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
@@ -40,7 +40,7 @@ const CATEGORY_CONFIG = {
   chain: { label: 'Chains', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
   bracelet: { label: 'Bracelets', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
   tie: { label: 'Ties', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
-  scarf: { label: 'Scarves', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
+  scarf: { label: 'Scarf', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
   bag: { label: 'Bags', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
   sportswear: { label: 'Sportswear', icon: <Plus className="w-4 h-4" />, group: 'Sportswear' },
   tracksuit: { label: 'Tracksuits', icon: <Plus className="w-4 h-4" />, group: 'Sportswear' },
@@ -64,9 +64,9 @@ function rgbToHex(r, g, b) {
 
 const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
   const styleClass = STYLE_COLORS[item.style] || STYLE_COLORS.casual;
-  
+
   return (
-    <motion.div 
+    <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -76,17 +76,17 @@ const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
     >
       <div className="aspect-[4/5] bg-gradient-to-b from-white/5 to-transparent w-full overflow-hidden flex items-center justify-center p-6 relative">
         <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none" />
-        
-        <motion.img 
-          src={item.image_url} 
-          alt={item.type} 
-          className="object-contain w-full h-full drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10" 
+
+        <motion.img
+          src={item.image_url}
+          alt={item.type}
+          className="object-contain w-full h-full drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10"
           whileHover={{ scale: 1.1, rotate: 2 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         />
-        
+
         <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 z-20">
-          <button 
+          <button
             onClick={() => onDelete(item._id)}
             className="p-2.5 bg-red-500/10 text-red-500 backdrop-blur-md rounded-xl border border-red-500/20 hover:bg-red-500 hover:text-text transition-all transform hover:scale-110"
             title="Delete"
@@ -113,9 +113,9 @@ const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
 
         {(item.wear_count || 0) > 0 && (
           <div className="absolute bottom-4 left-4 z-20">
-             <div className="px-3 py-1.5 bg-surface border border-border-subtle rounded-2xl text-[10px] font-black uppercase tracking-widest text-text-muted">
-                Worn {item.wear_count}x
-             </div>
+            <div className="px-3 py-1.5 bg-surface border border-border-subtle rounded-2xl text-[10px] font-black uppercase tracking-widest text-text-muted">
+              Worn {item.wear_count}x
+            </div>
           </div>
         )}
       </div>
@@ -131,22 +131,22 @@ const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
         </div>
 
         <div className="flex items-center justify-between">
-           <div className={`text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-lg border bg-gradient-to-br transition-all duration-500 ${styleClass}`}>
-              {item.style}
-            </div>
+          <div className={`text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-lg border bg-gradient-to-br transition-all duration-500 ${styleClass}`}>
+            {item.style}
+          </div>
 
-            {item.colors && item.colors.length > 0 && (
-              <div className="flex -space-x-1.5">
-                {item.colors.slice(0, 3).map((color, i) => (
-                  <div
-                    key={i}
-                    className="w-5 h-5 rounded-full border-2 border-darker shadow-lg cursor-pointer hover:scale-125 transition-transform z-[1]"
-                    style={{ backgroundColor: `rgb(${color[0]}, ${color[1]}, ${color[2]})` }}
-                    title={rgbToHex(color[0], color[1], color[2])}
-                  />
-                ))}
-              </div>
-            )}
+          {item.colors && item.colors.length > 0 && (
+            <div className="flex -space-x-1.5">
+              {item.colors.slice(0, 3).map((color, i) => (
+                <div
+                  key={i}
+                  className="w-5 h-5 rounded-full border-2 border-darker shadow-lg cursor-pointer hover:scale-125 transition-transform z-[1]"
+                  style={{ backgroundColor: `rgb(${color[0]}, ${color[1]}, ${color[2]})` }}
+                  title={rgbToHex(color[0], color[1], color[2])}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -235,7 +235,7 @@ export default function Wardrobe() {
   }), [clothes]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 bg-background text-text"
@@ -243,10 +243,10 @@ export default function Wardrobe() {
       {/* Header Dashboard */}
       <div className="relative mb-20">
         <div className="absolute top-[-100%] left-[-10%] w-[30%] h-[200%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-        
+
         <div className="flex flex-col lg:flex-row gap-12 items-start justify-between relative z-10">
           <div className="max-w-xl">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="inline-flex items-center gap-2 px-3 py-1 bg-surface border border-border-subtle rounded-2xl text-primary mb-6 text-[10px] font-black uppercase tracking-widest"
@@ -259,14 +259,14 @@ export default function Wardrobe() {
             <p className="text-lg text-text-muted font-medium mb-10 leading-relaxed">
               Explore your collection through our neural classification system. Every fiber, color, and silhouette indexed for perfect coordination.
             </p>
-            
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <StatCard label="Total Assets" value={stats.totalItems} icon={<Shirt />} />
               <StatCard label="Classifications" value={stats.totalCategories} icon={<Layers />} />
               <StatCard label="Style Vectors" value={stats.groups.length} icon={<Palette />} />
             </div>
           </div>
-          
+
           <div className="w-full lg:w-[400px]">
             <UploadDropzone onUploadSuccess={handleUploadSuccess} />
           </div>
@@ -276,15 +276,15 @@ export default function Wardrobe() {
       {/* Control Bar */}
       <div className="flex flex-col md:flex-row gap-6 items-center justify-between mb-12 sticky top-24 z-30 py-4 bg-surface border border-border-subtle rounded-2xl px-6 shadow-2xl">
         <div className="flex flex-wrap gap-2">
-          <FilterButton 
-            active={activeGroup === 'All'} 
+          <FilterButton
+            active={activeGroup === 'All'}
             onClick={() => setActiveGroup('All')}
             label="All Assets"
           />
           {stats.groups.map(group => (
-            <FilterButton 
+            <FilterButton
               key={group}
-              active={activeGroup === group} 
+              active={activeGroup === group}
               onClick={() => setActiveGroup(group)}
               label={group}
             />
@@ -293,7 +293,7 @@ export default function Wardrobe() {
 
         <div className="relative w-full md:w-80 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
-          <input 
+          <input
             type="text"
             placeholder="Search silhouettes, styles, colors..."
             value={searchQuery}
@@ -307,26 +307,26 @@ export default function Wardrobe() {
       <LayoutGroup>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-40 gap-4 text-text-muted">
-            <motion.div 
-              animate={{ rotate: 360 }} 
+            <motion.div
+              animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full" 
+              className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full"
             />
             <span className="text-sm font-black uppercase tracking-widest animate-pulse">Synchronizing Data...</span>
           </div>
         ) : filteredClothes.length === 0 ? (
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="text-center py-32 bg-surface border border-border-subtle rounded-2xl shadow-2xl relative overflow-hidden"
           >
             <div className="absolute top-1/2 left-1/2 -z-10 w-64 h-64 bg-primary/10 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2" />
             <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-8 text-text-muted border border-white/10">
-               <Search className="w-10 h-10" />
+              <Search className="w-10 h-10" />
             </div>
             <h3 className="text-3xl font-black mb-4 tracking-tight">No matching assets found</h3>
             <p className="text-text-muted max-w-md mx-auto font-medium">Your search criteria didn't yield any results from our neural indexing.</p>
-            <button 
+            <button
               onClick={() => { setSearchQuery(''); setActiveGroup('All'); }}
               className="mt-8 px-8 py-4 bg-primary text-darker font-black rounded-2xl hover:scale-105 transition-transform active:scale-95"
             >
@@ -336,7 +336,7 @@ export default function Wardrobe() {
         ) : (
           <div className="space-y-24">
             {GROUP_ORDER.filter(g => groupedBySection[g]).map(groupName => (
-              <motion.div 
+              <motion.div
                 layout
                 key={groupName}
                 initial={{ opacity: 0 }}
@@ -346,14 +346,14 @@ export default function Wardrobe() {
               >
                 {/* Section Header */}
                 <div className="flex items-end gap-6 mb-12">
-                   <div className="shrink-0">
-                      <h2 className="text-4xl font-black tracking-tighter text-text">{groupName}</h2>
-                      <div className="h-1.5 w-12 bg-primary mt-2 rounded-full" />
-                   </div>
-                   <div className="flex-1 h-px bg-white/5 mb-4" />
-                   <div className="mb-2 px-4 py-1.5 bg-surface border border-border-subtle rounded-2xl text-[10px] font-black uppercase tracking-widest text-text-muted">
-                      {Object.values(groupedBySection[groupName]).flat().length} Units
-                   </div>
+                  <div className="shrink-0">
+                    <h2 className="text-4xl font-black tracking-tighter text-text">{groupName}</h2>
+                    <div className="h-1.5 w-12 bg-primary mt-2 rounded-full" />
+                  </div>
+                  <div className="flex-1 h-px bg-white/5 mb-4" />
+                  <div className="mb-2 px-4 py-1.5 bg-surface border border-border-subtle rounded-2xl text-[10px] font-black uppercase tracking-widest text-text-muted">
+                    {Object.values(groupedBySection[groupName]).flat().length} Units
+                  </div>
                 </div>
 
                 <div className="space-y-16">
@@ -364,22 +364,22 @@ export default function Wardrobe() {
                     return (
                       <div key={type} className="relative">
                         <div className="flex items-center gap-3 mb-8">
-                           <div className="w-10 h-10 bg-surface border border-border-subtle rounded-2xl flex items-center justify-center text-primary">
-                              {config.icon}
-                           </div>
-                           <div>
-                              <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em]">{config.label}</h3>
-                              <div className="text-[10px] font-bold text-primary/50">{items.length} Variations Indexed</div>
-                           </div>
+                          <div className="w-10 h-10 bg-surface border border-border-subtle rounded-2xl flex items-center justify-center text-primary">
+                            {config.icon}
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em]">{config.label}</h3>
+                            <div className="text-[10px] font-bold text-primary/50">{items.length} Variations Indexed</div>
+                          </div>
                         </div>
 
-                        <motion.div 
+                        <motion.div
                           layout
                           className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
                         >
                           <AnimatePresence mode="popLayout">
                             {items.map(item => (
-                              <ItemCard 
+                              <ItemCard
                                 key={item._id}
                                 item={item}
                                 onDelete={handleDelete}
@@ -416,13 +416,12 @@ function StatCard({ label, value, icon }) {
 
 function FilterButton({ active, onClick, label }) {
   return (
-    <button 
+    <button
       onClick={onClick}
-      className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-        active 
-          ? 'bg-primary text-darker shadow-glow' 
-          : 'bg-transparent text-text-muted hover:text-text hover:bg-white/5 border border-white/10 hover:border-white/20'
-      }`}
+      className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active
+        ? 'bg-primary text-darker shadow-glow'
+        : 'bg-transparent text-text-muted hover:text-text hover:bg-white/5 border border-white/10 hover:border-white/20'
+        }`}
     >
       {label}
     </button>

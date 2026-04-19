@@ -189,7 +189,7 @@ export default function Planner() {
 
   useEffect(() => {
     fetchPlan();
-  }, [fetchPlan]);
+  }, []); // RUN ONLY ONCE
 
   const handleGenerate = useCallback(async () => {
     setLoading(true);

@@ -221,15 +221,6 @@ def preload_models():
     """Manually pre-load models to avoid lag on first request."""
     logger.info("[classifier] Pre-loading models...")
     _ensure_model_loaded()
-    
-    # Also pre-load the jacket verifier (CLIP)
-    try:
-        from app.ai.jacket_verifier import JacketVerifier
-        JacketVerifier.load()
-    except Exception as e:
-        logger.info(f"[classifier] Could not pre-load jacket verifier: {e}")
-    
-    logger.info("[classifier] Models pre-loaded successfully.")
 
 
 def _ensure_model_loaded():
@@ -403,19 +394,6 @@ def classify_image(image_path: str) -> dict:
             best_type = "unknown"
             top3 = [{"type": "unknown", "score": round(best_score, 4)}]
 
-    # --- Secondary Verification for Jackets & Shirts ---
-    if best_type in ["tshirt", "shirt", "jacket", "accessories", "unknown", "top"]:
-        try:
-            from app.ai.jacket_verifier import verify_jacket_or_shirt
-            verified_type = verify_jacket_or_shirt(image_path)
-            if verified_type != "unknown" and verified_type != best_type:
-                logger.info(f"[classifier] Overriding prediction from {best_type} to {verified_type} using CLIP")
-                best_type = verified_type
-                # Ensure it appears at the top of top3 if we changed it
-                if top3 and top3[0]["type"] != best_type:
-                    top3 = [{"type": best_type, "score": 0.99}] + [t for t in top3 if t["type"] != best_type][:2]
-        except Exception as e:
-            logger.error(f"[classifier] Jacket verification failed: {e}")
 
     return {
         "type": best_type,

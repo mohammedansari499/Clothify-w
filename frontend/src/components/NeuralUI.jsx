@@ -1,32 +1,53 @@
 import { motion } from 'framer-motion';
 
-export const NeuralButton = ({ children, onClick, variant = 'primary', size = 'md', icon: Icon, className = '', ...props }) => {
-  const baseStyles = "px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 font-display relative overflow-hidden group magnetic cursor-pointer";
+export const NeuralButton = ({
+  children,
+  onClick,
+  variant = 'primary',
+  size = 'md',
+  icon: Icon,
+  className = '',
+  ...props
+}) => {
+
+  const baseStyles =
+    "px-5 py-2.5 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 font-display relative overflow-hidden group cursor-pointer";
 
   const sizes = {
     sm: "px-4 py-2 text-xs",
-    md: "px-6 py-3 text-sm",
-    lg: "px-8 py-4 text-base tracking-widest"
+    md: "px-5 py-2.5 text-sm",
+    lg: "px-6 py-3 text-sm"
   };
 
   const variants = {
-    primary: "bg-primary text-background shadow-sm hover:shadow-md hover:shadow-primary/20 hover:scale-[1.02] border border-primary/20",
-    secondary: "bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-border-subtle text-text hover:border-primary/30 hover:scale-[1.02]",
-    glass: "bg-surface shadow-sm border border-border-subtle text-text hover:border-primary/50 hover:shadow-md",
-    outline: "bg-transparent border border-primary/30 text-primary hover:bg-primary/5 hover:border-primary hover:shadow-sm",
-    ghost: "text-text-muted hover:text-text hover:bg-surface"
+    primary:
+      "bg-primary text-background shadow-sm hover:shadow-md hover:shadow-primary/20 hover:scale-[1.02] border border-primary/20",
+
+    secondary:
+      "bg-surface border border-border-subtle text-text hover:border-primary/30 hover:scale-[1.02]",
+
+    glass:
+      "bg-surface shadow-sm border border-border-subtle text-text hover:border-primary/50 hover:shadow-md",
+
+    outline:
+      "bg-transparent border border-primary/30 text-primary hover:bg-primary/5 hover:border-primary",
+
+    ghost:
+      "text-text-muted hover:text-text hover:bg-surface"
   };
 
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.96 }}
       onClick={onClick}
       className={`${baseStyles} ${sizes[size]} ${variants[variant]} ${className}`}
       {...props}
     >
-      {/* Removed gradient shimmer */}
-      {Icon && <Icon className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />}
       <span className="relative z-10">{children}</span>
+
+      {Icon && (
+        <Icon className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+      )}
     </motion.button>
   );
 };

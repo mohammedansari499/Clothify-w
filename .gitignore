@@ -31,6 +31,7 @@ uploads/
 
 backend/app/ai/weights/
 *.jsonl
+*.pth
 
 # OS files
 .DS_Store

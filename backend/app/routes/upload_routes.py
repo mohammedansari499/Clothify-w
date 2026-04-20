@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 
 upload = Blueprint("upload", __name__)
 
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "avif", "heic", "heif"}
 
 
 def _allowed_file(filename):

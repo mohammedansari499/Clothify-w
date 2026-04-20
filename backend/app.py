@@ -18,6 +18,7 @@ from app.routes.collection_routes import collections
 from app.routes.outfit_routes import outfits
 from app.routes.upload_routes import upload
 from app.routes.weather_routes import weather_bp
+from app.config.db import check_db_connection
 
 app = Flask(__name__)
 
@@ -49,12 +50,27 @@ def home():
     return {"message": "WardrobeAI backend running successfully"}
 
 
+@app.route("/api/health")
+def health():
+    db_status = check_db_connection()
+    return {
+        "status": "online",
+        "database": "connected" if db_status else "disconnected"
+    }, 200 if db_status else 503
+
+
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
 if __name__ == "__main__":
+    print("Checking database connection...")
+    if check_db_connection():
+        print("Database connected successfully.")
+    else:
+        print("WARNING: Database connection failed. Some features may not work.")
+    
     threading.Thread(target=preload_models, daemon=True).start()
     debug = os.getenv("FLASK_DEBUG", "false").lower() in {"1", "true", "yes"}
     app.run(debug=debug)

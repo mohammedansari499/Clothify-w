@@ -32,6 +32,7 @@ STYLE_MAP = {
     "socks": "accessory", "ring": "accessory", "chain": "accessory",
     "bracelet": "accessory", "tie": "formal", "scarf": "casual",
     "bag": "accessory", "accessories": "accessory",
+    "waistcoat": "formal",
     "unknown": "casual",
 }
 

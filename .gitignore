@@ -29,6 +29,9 @@ yarn-error.log*
 backend/uploads/
 uploads/
 
+backend/app/ai/weights/
+*.jsonl
+
 # OS files
 .DS_Store
 Thumbs.db

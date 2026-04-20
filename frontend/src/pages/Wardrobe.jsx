@@ -24,7 +24,7 @@ const CATEGORY_CONFIG = {
   cargo_pants: { label: 'Cargo Pants', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
   shorts: { label: 'Shorts', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
   track_pants: { label: 'Track Pants', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
-  pyjama: { label: 'Pyjamas', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
+  pyjama: { label: 'Kurta', icon: <Layers className="w-4 h-4" />, group: 'Traditional' },
   dress: { label: 'Dresses', icon: <Palette className="w-4 h-4" />, group: 'Dresses' },
   skirt: { label: 'Skirts', icon: <Palette className="w-4 h-4" />, group: 'Dresses' },
   sneakers: { label: 'Sneakers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
@@ -51,7 +51,7 @@ const GROUP_ORDER = ['Tops', 'Bottoms', 'Outerwear', 'Traditional', 'Dresses', '
 
 const STYLE_COLORS = {
   formal: 'from-blue-500/20 to-indigo-500/20 text-blue-400 border-blue-500/30',
-  'semi-formal': 'from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30',
+  semiformal: 'from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30',
   casual: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
   traditional: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30',
   athletic: 'from-rose-500/20 to-red-500/20 text-rose-400 border-rose-500/30',

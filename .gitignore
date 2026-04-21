@@ -58,6 +58,8 @@ backend/test_output*.txt
 backend/test_results*.txt
 WardrobeAI_Windows_Guide*.jsx
 
+Clothify w.txt
+
 # Docker
 mongo_data/
 

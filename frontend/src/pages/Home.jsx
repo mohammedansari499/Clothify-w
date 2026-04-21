@@ -1,11 +1,11 @@
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import {
   motion,
   useScroll,
   useTransform,
   useSpring,
   AnimatePresence,
-} from 'framer-motion';
+} from "framer-motion";
 import {
   ArrowRight,
   Sparkles,
@@ -16,12 +16,12 @@ import {
   ShoppingBag,
   Wind,
   ChevronDown,
-} from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
-import { NeuralButton, NeuralCard, NeuralBadge } from '../components/NeuralUI';
+} from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { NeuralButton, NeuralCard, NeuralBadge } from "../components/NeuralUI";
 
 /* ─── tiny utility ──────────────────────────────────── */
-function useInView(ref, threshold = 0.15) {
+/*function useInView(ref, threshold = 0.15) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -32,17 +32,17 @@ function useInView(ref, threshold = 0.15) {
     return () => obs.disconnect();
   }, [ref, threshold]);
   return visible;
-}
+}*/
 
 /* ─── stagger container ─────────────────────────────── */
-const stagger = {
+/*const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12 } },
 };
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] } },
-};
+};*/
 
 /* ═══════════════════════════════════════════════════════
    HOME PAGE
@@ -52,10 +52,14 @@ export default function Home() {
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ['start start', 'end start'],
+    offset: ["start start", "end start"],
   });
 
-  const smooth = useSpring(scrollYProgress, { stiffness: 80, damping: 20, mass: 0.3 });
+  const smooth = useSpring(scrollYProgress, {
+    stiffness: 80,
+    damping: 20,
+    mass: 0.3,
+  });
 
   const heroY = useTransform(smooth, [0, 0.35], [0, -60]);
   const heroOpacity = useTransform(smooth, [0, 0.3], [1, 0]);
@@ -66,25 +70,35 @@ export default function Home() {
   /* scroll-cue fades out after first scroll */
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const unsub = scrollYProgress.on('change', v => { if (v > 0.02) setScrolled(true); });
+    const unsub = scrollYProgress.on("change", (v) => {
+      if (v > 0.02) setScrolled(true);
+    });
     return unsub;
   }, [scrollYProgress]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-transparent overflow-x-hidden">
-
+    <div
+      ref={containerRef}
+      className="flex-1 w-full flex flex-col items-center bg-transparent overflow-x-hidden"
+    >
       {/* ══════════════ HERO ══════════════ */}
       <section className="relative w-full min-h-[80vh] flex flex-col items-center justify-center px-4 pt-20 pb-12 overflow-hidden">
-
         {/* ambient blobs (same language as Login) */}
-        <motion.div style={{ y: blob1Y }}
+        <motion.div
+          style={{ y: blob1Y }}
           animate={{ scale: [1, 1.15, 1], opacity: [0.18, 0.28, 0.18] }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[130px] -z-10 pointer-events-none"
         />
-        <motion.div style={{ y: blob2Y }}
+        <motion.div
+          style={{ y: blob2Y }}
           animate={{ scale: [1, 1.08, 1], opacity: [0.08, 0.18, 0.08] }}
-          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+          transition={{
+            duration: 9,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1.5,
+          }}
           className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] -z-10 pointer-events-none"
         />
 
@@ -93,26 +107,20 @@ export default function Home() {
           className="w-full max-w-5xl mx-auto text-center z-10"
         >
           {/* eyebrow badge */}
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.55 }}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-card border border-border-subtle mb-10 shadow-sm"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] font-black uppercase tracking-[0.35em] text-text-muted">
-              AI-Powered Style OS
-            </span>
-          </motion.div>
 
           {/* headline */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25, duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              delay: 0.25,
+              duration: 0.75,
+              ease: [0.22, 1, 0.36, 1],
+            }}
             className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-5 leading-[1] text-text"
           >
-            Dress like<br />
+            Dress like
+            <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-azure to-accent bg-[length:200%_auto] animate-gradient-x italic">
               yourself.
             </span>
@@ -125,8 +133,9 @@ export default function Home() {
             transition={{ delay: 0.45, duration: 0.6 }}
             className="text-sm md:text-lg text-text-muted mb-10 leading-relaxed max-w-xl mx-auto font-medium"
           >
-            Clothify learns your unique aesthetic, curates outfits from your wardrobe,
-            and helps you show up as the best version of you — every single day.
+            Clothify learns your unique aesthetic, curates outfits from your
+            wardrobe, and helps you show up as the best version of you — every
+            single day.
           </motion.p>
 
           {/* CTAs */}
@@ -160,41 +169,42 @@ export default function Home() {
         >
           {/* card matches Login's rounded-[2.5rem] + border-border-subtle style */}
           <div className="bg-card backdrop-blur-xl rounded-[2.5rem] border border-border-subtle shadow-[0_20px_60px_rgba(0,0,0,0.45)] overflow-hidden relative">
-
             {/* accent glow (same as Login) */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
 
             <div className="grid lg:grid-cols-2 min-h-[520px]">
-
               {/* left: copy */}
               <div className="relative z-10 p-10 md:p-14 flex flex-col justify-center">
-                <NeuralBadge className="mb-6 self-start">Live Recommendation</NeuralBadge>
-
                 <h2 className="text-5xl font-black tracking-tighter leading-none mb-6 text-text">
-                  Your outfit,<br />
-                  <span className="text-primary italic font-serif">decided.</span>
+                  Your outfit,
+                  <br />
+                  <span className="text-primary italic font-serif">
+                    decided.
+                  </span>
                 </h2>
 
                 <p className="text-text-muted leading-relaxed mb-10 max-w-sm text-base font-medium">
-                  Tell us the vibe, the weather, the occasion — Clothify handles the rest,
-                  pulling from pieces you already own and love.
+                  Tell us the vibe, the weather, the occasion — Clothify handles
+                  the rest, pulling from pieces you already own and love.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3 mb-10">
                   {[
-                    { label: 'Smart Matching', sub: 'Color & fabric harmony' },
-                    { label: 'Context Aware', sub: 'Weather + occasion fit' },
-                    { label: 'Your Style DNA', sub: 'Learns over time' },
-                    { label: 'Zero Waste', sub: 'Love what you own' },
+                    { label: "Smart Matching", sub: "Color & fabric harmony" },
+                    { label: "Context Aware", sub: "Weather + occasion fit" },
+                    { label: "Your Style DNA", sub: "Learns over time" },
+                    { label: "Zero Waste", sub: "Love what you own" },
                   ].map(({ label, sub }, i) => (
                     <motion.div
                       key={i}
                       whileHover={{ scale: 1.03, y: -2 }}
-                      transition={{ type: 'spring', stiffness: 220 }}
+                      transition={{ type: "spring", stiffness: 220 }}
                       className="p-4 rounded-2xl bg-card border border-border-subtle hover:border-primary/25 transition-all duration-300"
                     >
-                      <p className="text-xs font-black text-text mb-1">{label}</p>
+                      <p className="text-xs font-black text-text mb-1">
+                        {label}
+                      </p>
                       <p className="text-[11px] text-text-muted/60">{sub}</p>
                     </motion.div>
                   ))}
@@ -211,18 +221,22 @@ export default function Home() {
               <div className="relative overflow-hidden bg-darker rounded-r-[2.5rem]">
                 <motion.img
                   src="/uploads/wp9337752-dark-neon-wallpapers.JPG"
-                  alt="Style preview"
+                  alt=""
                   className="absolute inset-0 w-full h-full object-cover opacity-50"
                   whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 1.4, ease: 'easeOut' }}
+                  transition={{ duration: 1.4, ease: "easeOut" }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-darker via-darker/30 to-transparent" />
 
                 {/* scanning line */}
                 <div className="absolute inset-0 pointer-events-none border border-primary/10 m-5 rounded-2xl overflow-hidden">
                   <motion.div
-                    animate={{ y: ['0%', '100%'] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                    animate={{ y: ["0%", "100%"] }}
+                    transition={{
+                      duration: 5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
                     className="w-full h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent blur-sm"
                   />
                 </div>
@@ -246,14 +260,17 @@ export default function Home() {
                     transition={{ delay: 0.55 }}
                     viewport={{ once: true }}
                   >
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">Recommended</p>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">
+                      Recommended
+                    </p>
                     <h3 className="text-5xl font-black tracking-tighter text-text italic leading-none">
-                      Linen<br />Summer <span className="text-primary">Edit</span>
+                      Linen
+                      <br />
+                      Summer <span className="text-primary">Edit</span>
                     </h3>
                   </motion.div>
                 </div>
               </div>
-
             </div>
           </div>
         </motion.div>
@@ -262,26 +279,30 @@ export default function Home() {
       {/* ══════════════ HOW IT WORKS ══════════════ */}
       <Section className="w-full max-w-6xl mx-auto px-4 pb-24">
         <SectionLabel>How Clothify Works</SectionLabel>
-        <SectionHeading>Three steps to<br /><em>your best look.</em></SectionHeading>
+        <SectionHeading>
+          Three steps to
+          <br />
+          <em>your best look.</em>
+        </SectionHeading>
 
         <div className="grid md:grid-cols-3 gap-6 mt-12">
           {[
             {
-              num: '01',
+              num: "01",
               icon: <ShoppingBag className="w-6 h-6" />,
-              title: 'Upload your wardrobe',
+              title: "Upload your wardrobe",
               body: "Snap or upload photos of your clothes. Clothify catalogs every piece — colors, fabrics, fits — and organizes your closet digitally.",
             },
             {
-              num: '02',
+              num: "02",
               icon: <Sparkles className="w-6 h-6" />,
-              title: 'Tell us your vibe',
+              title: "Tell us your vibe",
               body: "Heading to brunch? A big meeting? A first date? Describe the occasion and mood — even just a few words is enough.",
             },
             {
-              num: '03',
+              num: "03",
               icon: <Star className="w-6 h-6" />,
-              title: 'Get your outfit',
+              title: "Get your outfit",
               body: "Clothify assembles a complete look from pieces you own, explains why it works, and offers alternatives if you want to switch things up.",
             },
           ].map(({ num, icon, title, body }, i) => (
@@ -289,7 +310,11 @@ export default function Home() {
               key={i}
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.13, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+              transition={{
+                delay: i * 0.13,
+                duration: 0.65,
+                ease: [0.22, 1, 0.36, 1],
+              }}
               whileHover={{ y: -6 }}
               viewport={{ once: true, amount: 0.2 }}
             >
@@ -307,8 +332,12 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-black text-text mb-3 tracking-tight">{title}</h3>
-                  <p className="text-text-muted text-sm leading-relaxed font-medium">{body}</p>
+                  <h3 className="text-xl font-black text-text mb-3 tracking-tight">
+                    {title}
+                  </h3>
+                  <p className="text-text-muted text-sm leading-relaxed font-medium">
+                    {body}
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -320,7 +349,11 @@ export default function Home() {
       <Section className="w-full border-t border-border-subtle py-24">
         <div className="max-w-6xl mx-auto px-4">
           <SectionLabel>What's inside</SectionLabel>
-          <SectionHeading>Everything you<br /><em>didn't know you needed.</em></SectionHeading>
+          <SectionHeading>
+            Everything you
+            <br />
+            <em>didn't know you needed.</em>
+          </SectionHeading>
 
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             <FeatureCard
@@ -359,7 +392,7 @@ export default function Home() {
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               whileInView={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+              transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
               viewport={{ once: true }}
               className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-8 border border-primary/20 shadow-inner"
             >
@@ -367,12 +400,14 @@ export default function Home() {
             </motion.div>
 
             <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-5 text-text leading-tight">
-              Ready to open<br />
+              Ready to open
+              <br />
               <span className="text-primary italic">your wardrobe?</span>
             </h2>
 
             <p className="text-text-muted text-base md:text-lg font-medium mb-10 max-w-xl mx-auto leading-relaxed">
-              Join thousands of people who've stopped stressing about what to wear.
+              Join thousands of people who've stopped stressing about what to
+              wear.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -397,14 +432,13 @@ export default function Home() {
           © 2026 Clothify — wear yourself
         </p>
       </footer>
-
     </div>
   );
 }
 
 /* ─── layout helpers ────────────────────────────────── */
 
-function Section({ children, className = '' }) {
+function Section({ children, className = "" }) {
   return <section className={`w-full ${className}`}>{children}</section>;
 }
 
@@ -467,8 +501,12 @@ function FeatureCard({ icon, title, body }) {
           <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-7 inline-flex group-hover:scale-110 transition-transform duration-300">
             {icon}
           </div>
-          <h3 className="text-xl font-black text-text mb-3 tracking-tight">{title}</h3>
-          <p className="text-sm text-text-muted leading-relaxed font-medium">{body}</p>
+          <h3 className="text-xl font-black text-text mb-3 tracking-tight">
+            {title}
+          </h3>
+          <p className="text-sm text-text-muted leading-relaxed font-medium">
+            {body}
+          </p>
         </div>
       </div>
     </motion.div>

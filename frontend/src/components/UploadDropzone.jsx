@@ -7,39 +7,6 @@ export default function UploadDropzone({ onUploadSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  const maybeConvertWebpToJpeg = useCallback(async (file) => {
-    if (!file || file.type !== 'image/webp' || typeof createImageBitmap !== 'function') {
-      return file;
-    }
-
-    try {
-      const bitmap = await createImageBitmap(file);
-      const canvas = document.createElement('canvas');
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return file;
-
-      // Match backend preprocessing intent for transparent WEBP uploads.
-      ctx.fillStyle = '#f2f2f2';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(bitmap, 0, 0);
-      if (typeof bitmap.close === 'function') bitmap.close();
-
-      const blob = await new Promise((resolve) => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.94);
-      });
-      if (!blob) return file;
-
-      const convertedName = file.name.replace(/\.webp$/i, '.jpg');
-      return new File([blob], convertedName, { type: 'image/jpeg' });
-    } catch (convertErr) {
-      console.warn('WEBP conversion skipped:', convertErr);
-      return file;
-    }
-  }, []);
-
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (!file) return;
@@ -48,9 +15,8 @@ export default function UploadDropzone({ onUploadSuccess }) {
     setError('');
 
     try {
-      const preparedFile = await maybeConvertWebpToJpeg(file);
       const formData = new FormData();
-      formData.append('file', preparedFile);
+      formData.append('file', file);
 
       // 1. Upload the file to Cloudinary via backend
       const uploadRes = await api.post('/upload/', formData, {
@@ -68,22 +34,19 @@ export default function UploadDropzone({ onUploadSuccess }) {
       const backendCode = responseData.error;
       const backendMessage = responseData.message || responseData.error;
 
-      if (backendCode === 'low_confidence') {
-        setError(
-          `${backendMessage || 'Classification was ambiguous.'} ` +
-          'Tip: upload a cropped single-item photo; full-body and WEBP images are less reliable.'
-        );
+      if (backendCode === 'low_confidence' || backendCode === 'shirt_vs_outerwear_ambiguity') {
+        setError('AI retry failed, try a tighter crop / single-item image');
       } else {
         setError(backendMessage || 'Failed to process clothing item');
       }
     } finally {
       setUploading(false);
     }
-  }, [maybeConvertWebpToJpeg, onUploadSuccess]);
+  }, [onUploadSuccess]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.webp'] },
+    accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.avif'] },
     multiple: false
   });
 

@@ -1,71 +1,113 @@
-# Python
-venv/
-env/
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# =========================
+# PYTHON
+# =========================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.egg-info/
-.pytest_cache/
-htmlcov/
-.coverage
-*.cover
-coverage-report/
+*.py[cod]
+*.so
 
-# Node
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Python environment files
+.env
+.env.*
+*.env
+!.env.example
+
+# =========================
+# BACKEND (FLASK)
+# =========================
+backend/__pycache__/
+backend/instance/
+backend/*.log
+
+# Uploads (DO NOT PUSH USER FILES)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# =========================
+# AI / ML (CRITICAL)
+# =========================
+backend/app/ai/weights/*
+!backend/app/ai/weights/README.md
+
+# =========================
+# NODE / FRONTEND
+# =========================
 node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# Vite cache
+.vite/
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.npm/
+*.log
 
-# Environment variables
-.env
-*.env.*
-!.env.example
+# =========================
+# TEST / CACHE
+# =========================
+.pytest_cache/
+.cache/
+coverage/
+htmlcov/
+.coverage
+*.cover
 
-# Uploads
-backend/uploads/
-uploads/
-
-# OS files
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# IDE
+# =========================
+# IDE / EDITOR
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Logs & Temporary Execution Tracking files
-*.log
-changes_made
-changes_till_*
-execution_log.md
-fix needed.txt
-right_now.md
-model_works.md
-
-# Project-specific temporary/test artifacts
+# =========================
+# PROJECT TEMP FILES
+# =========================
 backend/tmp_*.py
 backend/debug_*.py
 backend/debug_*.txt
 backend/test_output*.txt
 backend/test_results*.txt
-WardrobeAI_Windows_Guide*.jsx
 
-# Docker
+# Dev notes (keep repo clean)
+changes_made
+changes_till_*
+execution_log.md
+fix needed.txt
+Clothify w.txt
+right_now.md
+
+# =========================
+# DOCKER
+# =========================
 mongo_data/
 
-# Build outputs
-dist/
-build/
-
-# Google Calendar Credentials
+# =========================
+# GOOGLE AUTH (SECRETS)
+# =========================
 credentials.json
 token.json
 backend/credentials.json

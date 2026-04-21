@@ -14,8 +14,8 @@ const CATEGORY_CONFIG = {
   formal_shirt: { label: 'Formal Shirts', icon: <Shirt className="w-4 h-4" />, group: 'Tops' },
   jacket: { label: 'Jackets', icon: <Layers className="w-4 h-4" />, group: 'Outerwear' },
   coat: { label: 'Coats', icon: <Layers className="w-4 h-4" />, group: 'Outerwear' },
-  hoodie: { label: 'Hoodies', icon: <Layers className="w-4 h-4" />, group: 'Outerwear' },
-  sweater: { label: 'Sweaters', icon: <Layers className="w-4 h-4" />, group: 'Outerwear' },
+  hoodie: { label: 'Hoodies', icon: <Layers className="w-4 h-4" />, group: 'Tops' },
+  sweater: { label: 'Sweaters', icon: <Layers className="w-4 h-4" />, group: 'Tops' },
   blazer: { label: 'Blazers', icon: <Layers className="w-4 h-4" />, group: 'Outerwear' },
   kurta: { label: 'Kurtas', icon: <Sparkles className="w-4 h-4" />, group: 'Traditional' },
   sherwani: { label: 'Sherwanis', icon: <Sparkles className="w-4 h-4" />, group: 'Traditional' },
@@ -48,6 +48,14 @@ const CATEGORY_CONFIG = {
 };
 
 const GROUP_ORDER = ['Tops', 'Bottoms', 'Outerwear', 'Traditional', 'Dresses', 'Footwear', 'Accessories', 'Sportswear', 'Other'];
+const BACKEND_CATEGORY_TO_GROUP = {
+  tops: 'Tops',
+  bottoms: 'Bottoms',
+  outerwear: 'Outerwear',
+  footwear: 'Footwear',
+  watch: 'Accessories',
+  other: 'Other',
+};
 
 const STYLE_COLORS = {
   formal: 'from-blue-500/20 to-indigo-500/20 text-blue-400 border-blue-500/30',
@@ -61,6 +69,16 @@ const STYLE_COLORS = {
 
 function rgbToHex(r, g, b) {
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function getItemGroup(item) {
+  const backendCategory = String(item?.category || '').toLowerCase();
+  if (backendCategory && BACKEND_CATEGORY_TO_GROUP[backendCategory]) {
+    return BACKEND_CATEGORY_TO_GROUP[backendCategory];
+  }
+  const type = item?.type || 'unknown';
+  const config = CATEGORY_CONFIG[type] || CATEGORY_CONFIG.unknown;
+  return config.group;
 }
 
 const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
@@ -220,8 +238,8 @@ export default function Wardrobe() {
     return clothes.filter(item => {
       const searchableText = `${item.type || ''} ${item.style || ''} ${item.color_name || ''} ${item.category || ''}`;
       const matchesSearch = searchableText.toLowerCase().includes(searchQuery.toLowerCase());
-      const config = CATEGORY_CONFIG[item.type] || CATEGORY_CONFIG.unknown;
-      const matchesGroup = activeGroup === 'All' || config.group === activeGroup;
+      const group = getItemGroup(item);
+      const matchesGroup = activeGroup === 'All' || group === activeGroup;
       return matchesSearch && matchesGroup;
     });
   }, [clothes, searchQuery, activeGroup]);
@@ -229,9 +247,8 @@ export default function Wardrobe() {
   const groupedBySection = useMemo(() => {
     const grouped = {};
     filteredClothes.forEach(item => {
+      const group = getItemGroup(item);
       const type = item.type || 'unknown';
-      const config = CATEGORY_CONFIG[type] || CATEGORY_CONFIG.unknown;
-      const group = config.group;
       if (!grouped[group]) grouped[group] = {};
       if (!grouped[group][type]) grouped[group][type] = [];
       grouped[group][type].push(item);
@@ -242,7 +259,7 @@ export default function Wardrobe() {
   const stats = useMemo(() => ({
     totalItems: clothes.length,
     totalCategories: new Set(clothes.map(c => c.type)).size,
-    groups: GROUP_ORDER.filter(g => clothes.some(c => (CATEGORY_CONFIG[c.type] || CATEGORY_CONFIG.unknown).group === g))
+    groups: GROUP_ORDER.filter(g => clothes.some(c => getItemGroup(c) === g))
   }), [clothes]);
 
   return (

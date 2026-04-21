@@ -60,10 +60,13 @@ ENABLE_TTA = os.getenv("CLOTHING_TTA", "0").strip() == "1"
 # Confidence gates for official-backbone remapping
 STRICT_TOTAL_MASS_MIN = 0.15
 STRICT_BEST_SCORE_MIN = 0.10
-SALVAGE_TOTAL_MASS_MIN = 0.10
-SALVAGE_BEST_SCORE_MIN = 0.07
-SALVAGE_GAP_MIN = 0.025
-SALVAGE_RATIO_MIN = 1.45
+SHIRT_OUTERWEAR_AMBIGUITY_GAP_MAX = 0.035
+SHIRT_OUTERWEAR_MIN_SCORE = 0.08
+WEAK_OUTERWEAR_WITH_SHIRT_RATIO = 0.75
+
+CROP_MODES = {"original", "torso", "lower_body"}
+SHIRT_FAMILY = {"shirt", "formal_shirt", "tshirt"}
+OUTERWEAR_LIKE_FAMILY = {"blazer", "jacket", "coat", "sweater", "hoodie"}
 
 # -------------------------------------------------------------------
 # Output taxonomy
@@ -147,37 +150,35 @@ STYLE_MAP = {
 
 LABEL_KEYWORDS_ORDERED = [
     # --- Tops / formal tops ---
-    (("dress shirt",), "formal_shirt", 1.30),
-    (("button-down", "button down"), "formal_shirt", 1.25),
-    (("polo shirt",), "shirt", 1.20),
-    (("blouse",), "shirt", 1.15),
-    (("shirt",), "shirt", 1.00),
+    (("dress shirt",), "formal_shirt", 1.45),
+    (("button-down", "button down"), "formal_shirt", 1.40),
+    (("t-shirt", "tee shirt", "jersey", "maillot", "tank top"), "tshirt", 1.35),
+    (("polo shirt",), "shirt", 1.30),
+    (("blouse",), "shirt", 1.25),
+    (("shirt",), "shirt", 1.20),
 
     # Common false positives for shirts
-    (("lab coat",), "shirt", 1.10),
-    (("military uniform",), "shirt", 1.10),
-    (("academic gown",), "shirt", 0.95),
-    (("vestment",), "shirt", 0.95),
-    (("gown", "robe", "caftan", "kaftan", "abaya"), "shirt", 0.90),
+    (("lab coat",), "shirt", 1.20),
+    (("military uniform",), "shirt", 1.20),
+    (("academic gown",), "shirt", 1.00),
+    (("vestment",), "shirt", 1.00),
+    (("gown", "robe", "caftan", "kaftan", "abaya"), "shirt", 0.95),
     (("bow tie",), "formal_shirt", 1.15),
     (("bolo tie",), "formal_shirt", 1.10),
     (("windsor tie",), "formal_shirt", 1.15),
     (("necktie",), "formal_shirt", 1.10),
 
-    # T-shirts
-    (("t-shirt", "tee shirt", "jersey", "maillot", "tank top"), "tshirt", 1.30),
-
     # Knit / casual top
-    (("hoodie", "sweatshirt"), "hoodie", 1.20),
-    (("cardigan", "pullover", "sweater"), "sweater", 1.15),
+    (("hoodie", "sweatshirt"), "hoodie", 1.05),
+    (("cardigan", "pullover", "sweater"), "sweater", 0.95),
 
     # --- Outerwear ---
-    (("blazer", "waistcoat"), "blazer", 1.25),
-    (("trench coat",), "coat", 1.30),
-    (("fur coat",), "coat", 1.25),
-    (("overcoat", "topcoat", "raincoat", "duffel coat", "pea coat"), "coat", 1.20),
-    (("coat",), "coat", 1.00),
-    (("parka", "poncho", "cloak", "windbreaker", "jacket", "puffer"), "jacket", 1.10),
+    (("blazer", "waistcoat"), "blazer", 1.15),
+    (("trench coat",), "coat", 1.15),
+    (("fur coat",), "coat", 1.10),
+    (("overcoat", "topcoat", "raincoat", "duffel coat", "pea coat"), "coat", 1.00),
+    (("coat",), "coat", 0.80),
+    (("parka", "poncho", "cloak", "windbreaker", "jacket", "puffer"), "jacket", 0.82),
 
     # --- Bottoms ---
     (("business suit",), "formal_pants", 1.20),
@@ -467,6 +468,58 @@ def _normalize_input_image(img, image_path: str):
     return img.convert("RGB")
 
 
+def _normalize_crop_mode(crop_mode: str | None) -> str:
+    normalized = str(crop_mode or "original").strip().lower()
+    return normalized if normalized in CROP_MODES else "original"
+
+
+def _safe_crop_box(width: int, height: int, box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    left, top, right, bottom = box
+    left = max(0, min(int(left), width - 1))
+    top = max(0, min(int(top), height - 1))
+    right = max(left + 1, min(int(right), width))
+    bottom = max(top + 1, min(int(bottom), height))
+    return left, top, right, bottom
+
+
+def _crop_box_for_mode(width: int, height: int, crop_mode: str) -> tuple[int, int, int, int]:
+    if crop_mode == "torso":
+        box = (
+            int(width * 0.12),
+            int(height * 0.08),
+            int(width * 0.88),
+            int(height * 0.72),
+        )
+        return _safe_crop_box(width, height, box)
+
+    if crop_mode == "lower_body":
+        box = (
+            int(width * 0.15),
+            int(height * 0.42),
+            int(width * 0.85),
+            int(height * 0.98),
+        )
+        return _safe_crop_box(width, height, box)
+
+    return 0, 0, width, height
+
+
+def _apply_crop_mode(img, crop_mode: str):
+    crop_mode = _normalize_crop_mode(crop_mode)
+    if crop_mode == "original":
+        return img
+
+    width, height = img.size
+    if width < 32 or height < 32:
+        return img
+
+    box = _crop_box_for_mode(width, height, crop_mode)
+    cropped = img.crop(box)
+    if cropped.size[0] < 24 or cropped.size[1] < 24:
+        return img
+    return cropped
+
+
 def _build_top3(ranked, raw_scores, limit=3):
     return [
         {
@@ -477,12 +530,29 @@ def _build_top3(ranked, raw_scores, limit=3):
     ]
 
 
-def _is_salvage_candidate(total_mass: float, best_score: float, runner_up_score: float) -> bool:
-    if total_mass < SALVAGE_TOTAL_MASS_MIN or best_score < SALVAGE_BEST_SCORE_MIN:
-        return False
-    confidence_gap = best_score - runner_up_score
-    lead_ratio = best_score / max(runner_up_score, 1e-6)
-    return confidence_gap >= SALVAGE_GAP_MIN and lead_ratio >= SALVAGE_RATIO_MIN
+def _is_shirt_vs_outerwear_ambiguity(
+    best_type: str,
+    best_score: float,
+    runner_up_type: str,
+    runner_up_score: float,
+    raw_scores: dict[str, float],
+) -> bool:
+    pair_is_mixed = (
+        (best_type in SHIRT_FAMILY and runner_up_type in OUTERWEAR_LIKE_FAMILY)
+        or (best_type in OUTERWEAR_LIKE_FAMILY and runner_up_type in SHIRT_FAMILY)
+    )
+    if pair_is_mixed and best_score >= SHIRT_OUTERWEAR_MIN_SCORE and runner_up_score >= SHIRT_OUTERWEAR_MIN_SCORE:
+        if (best_score - runner_up_score) <= SHIRT_OUTERWEAR_AMBIGUITY_GAP_MAX:
+            return True
+
+    shirt_mass = sum(raw_scores.get(item, 0.0) for item in SHIRT_FAMILY)
+    outerwear_mass = sum(raw_scores.get(item, 0.0) for item in OUTERWEAR_LIKE_FAMILY)
+    if best_type in OUTERWEAR_LIKE_FAMILY and shirt_mass >= best_score * WEAK_OUTERWEAR_WITH_SHIRT_RATIO:
+        return True
+    if best_type in SHIRT_FAMILY and outerwear_mass >= best_score * WEAK_OUTERWEAR_WITH_SHIRT_RATIO:
+        return True
+
+    return False
 
 
 def _map_label_to_type(label_name: str):
@@ -637,8 +707,9 @@ def _run_logits(img):
 # Main API
 # -------------------------------------------------------------------
 
-def classify_image(image_path: str) -> dict:
+def classify_image(image_path: str, crop_mode: str = "original") -> dict:
     _ensure_model_loaded()
+    crop_mode = _normalize_crop_mode(crop_mode)
 
     if (
         _model_unavailable
@@ -655,12 +726,13 @@ def classify_image(image_path: str) -> dict:
         if ImageOps is not None:
             img = ImageOps.exif_transpose(img)
         img = _normalize_input_image(img, image_path)
+        img_for_inference = _apply_crop_mode(img, crop_mode)
     except Exception as e:
         logger.error("[classifier] Cannot open image: %s", e)
         return _failure_result("image_open_failed")
 
     try:
-        logits = _run_logits(img)
+        logits = _run_logits(img_for_inference)
         probs = F.softmax(logits, dim=0)
     except Exception as e:
         logger.error("[classifier] Inference failed: %s", e)
@@ -690,14 +762,49 @@ def classify_image(image_path: str) -> dict:
             return _failure_result("unmapped_custom_prediction")
 
         best_type = top3[0]["type"]
-        best_score = top3[0]["score"]
+        best_score = float(top3[0]["score"])
+        runner_up_type = top3[1]["type"] if len(top3) > 1 else "unknown"
+        runner_up_score = float(top3[1]["score"]) if len(top3) > 1 else 0.0
+        raw_scores = {entry["type"]: float(entry["score"]) for entry in top3}
+
+        if best_score < STRICT_BEST_SCORE_MIN:
+            return _failure_result(
+                "low_confidence",
+                candidate_type=best_type,
+                candidate_score=best_score,
+                candidate_top3=top3,
+                extra={
+                    "runner_up_type": runner_up_type,
+                    "runner_up_score": round(runner_up_score, 4),
+                    "confidence_gap": round(float(best_score - runner_up_score), 4),
+                },
+            )
+
+        if _is_shirt_vs_outerwear_ambiguity(
+            best_type=best_type,
+            best_score=best_score,
+            runner_up_type=runner_up_type,
+            runner_up_score=runner_up_score,
+            raw_scores=raw_scores,
+        ):
+            return _failure_result(
+                "shirt_vs_outerwear_ambiguity",
+                candidate_type=best_type,
+                candidate_score=best_score,
+                candidate_top3=top3,
+                extra={
+                    "runner_up_type": runner_up_type,
+                    "runner_up_score": round(runner_up_score, 4),
+                    "confidence_gap": round(float(best_score - runner_up_score), 4),
+                },
+            )
 
         return {
             "ok": True,
             "type": best_type,
             "category": _category_for(best_type),
             "style": _style_for(best_type),
-            "confidence": round(float(best_score), 4),
+            "confidence": round(best_score, 4),
             "top3": top3,
             "label": f"{_model_name}:{best_type}",
         }
@@ -748,19 +855,36 @@ def classify_image(image_path: str) -> dict:
     normalized_best_type = _normalize_type(best_type)
     top3 = _build_top3(ranked, raw_scores, limit=3)
 
+    if normalized_best_type == "unknown":
+        return _failure_result(
+            "unknown",
+            candidate_type=best_type,
+            candidate_score=best_score,
+            candidate_top3=top3,
+        )
+
+    if _is_shirt_vs_outerwear_ambiguity(
+        best_type=normalized_best_type,
+        best_score=best_score,
+        runner_up_type=runner_up_type,
+        runner_up_score=runner_up_score,
+        raw_scores=raw_scores,
+    ):
+        return _failure_result(
+            "shirt_vs_outerwear_ambiguity",
+            candidate_type=normalized_best_type,
+            candidate_score=best_score,
+            candidate_top3=top3,
+            extra={
+                "total_mass": round(float(total_mass), 4),
+                "runner_up_type": runner_up_type,
+                "runner_up_score": round(float(runner_up_score), 4),
+                "confidence_gap": round(float(best_score - runner_up_score), 4),
+            },
+        )
+
     # Weak-evidence rejection
     if total_mass < STRICT_TOTAL_MASS_MIN or best_score < STRICT_BEST_SCORE_MIN:
-        if _is_salvage_candidate(total_mass, best_score, runner_up_score):
-            return {
-                "ok": True,
-                "type": normalized_best_type,
-                "category": _category_for(normalized_best_type),
-                "style": _style_for(normalized_best_type),
-                "confidence": round(float(best_score), 4),
-                "top3": top3,
-                "label": f"{_model_name}:{normalized_best_type}",
-                "salvaged": True,
-            }
         return _failure_result(
             "low_confidence",
             candidate_type=normalized_best_type,

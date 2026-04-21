@@ -11,12 +11,39 @@ from datetime import datetime, timedelta
 from itertools import product as itertools_product
 
 
-# Current classifier subtype taxonomy
-TOP_TYPES = {"tshirt", "shirt", "formal_shirt", "hoodie", "sweater"}
-BOTTOM_TYPES = {"jeans", "formal_pants", "cargo_pants", "track_pants", "shorts", "skirt", "pyjama"}
-SHOE_TYPES = {"sneakers", "shoes", "loafers", "sandals", "slippers"}
-OUTERWEAR_TYPES = {"blazer", "jacket", "coat"}
-ACCESSORY_TYPES = {"watch"}
+# Canonical classifier subtype-to-slot mapping
+SUBTYPE_SLOT_MAP = {
+    # Tops
+    "tshirt": "top",
+    "shirt": "top",
+    "formal_shirt": "top",
+    "hoodie": "top",
+    "sweater": "top",
+
+    # Outerwear
+    "blazer": "outerwear",
+    "jacket": "outerwear",
+    "coat": "outerwear",
+
+    # Bottoms
+    "jeans": "bottom",
+    "formal_pants": "bottom",
+    "cargo_pants": "bottom",
+    "track_pants": "bottom",
+    "shorts": "bottom",
+    "skirt": "bottom",
+    "pyjama": "bottom",
+
+    # Shoes
+    "sneakers": "shoes",
+    "shoes": "shoes",
+    "loafers": "shoes",
+    "sandals": "shoes",
+    "slippers": "shoes",
+
+    # Accessory
+    "watch": "accessory",
+}
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -215,25 +242,11 @@ def _group_by_slot(clothes):
     }
 
     for item in clothes:
-        item_type = item.get("type", "unknown")
-        if item_type in TOP_TYPES:
-            slots["top"].append(item)
-        elif item_type in BOTTOM_TYPES:
-            slots["bottom"].append(item)
-        elif item_type in SHOE_TYPES:
-            slots["shoes"].append(item)
-        elif item_type in OUTERWEAR_TYPES:
-            slots["outerwear"].append(item)
-        elif item_type in ACCESSORY_TYPES:
-            slots["accessory"].append(item)
-        else:
-            # Try to guess based on the type name
-            if "shirt" in item_type or "top" in item_type:
-                slots["top"].append(item)
-            elif "pant" in item_type or "jean" in item_type or "short" in item_type:
-                slots["bottom"].append(item)
-            elif "shoe" in item_type or "sneak" in item_type:
-                slots["shoes"].append(item)
+        item_type = str(item.get("type", "unknown")).strip().lower()
+        slot = SUBTYPE_SLOT_MAP.get(item_type)
+        if not slot:
+            continue
+        slots[slot].append(item)
 
     return slots
 

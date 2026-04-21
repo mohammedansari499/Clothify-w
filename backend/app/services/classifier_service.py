@@ -9,6 +9,19 @@ from app.ai.color_extractor import extract_colors
 
 logger = logging.getLogger(__name__)
 
+RETRY_CROP_MODES = ("torso", "lower_body")
+RETRYABLE_CLASSIFIER_ERRORS = {
+    "low_confidence",
+    "unknown",
+    "shirt_vs_outerwear_ambiguity",
+    "no_supported_garment_detected",
+}
+TOP_LIKE_TYPES = {"tshirt", "shirt", "formal_shirt", "hoodie", "sweater", "blazer", "jacket", "coat"}
+LOWER_BODY_PRIORITY_TYPES = {"formal_pants", "jeans"}
+LOWER_BODY_CONFIDENCE_MIN = 0.18
+LOWER_BODY_STRONG_CONFIDENCE = 0.30
+LOWER_BODY_MARGIN_MIN = 0.02
+
 STYLE_TAGS = {
     "formal": ["formal", "business", "office"],
     "semi-formal": ["semi-formal", "office", "casual"],
@@ -75,18 +88,136 @@ def _analysis_failure(code, message, classification=None, color_result=None):
     return payload
 
 
+def _is_retryable_failure(classification):
+    if classification.get("ok"):
+        return False
+    error_code = str(classification.get("error") or "").strip()
+    if error_code in RETRYABLE_CLASSIFIER_ERRORS:
+        return True
+    return classification.get("type", "unknown") == "unknown"
+
+
+def _pick_best_success(results):
+    return max(
+        results,
+        key=lambda item: (
+            float(item.get("confidence", 0.0)),
+            len(item.get("top3") or []),
+        ),
+    )
+
+
+def _failure_rank(classification):
+    priority = {
+        "shirt_vs_outerwear_ambiguity": 3,
+        "low_confidence": 2,
+        "unknown": 1,
+    }
+    error_code = str(classification.get("error") or "")
+    return (
+        priority.get(error_code, 0),
+        float(classification.get("confidence", 0.0)),
+    )
+
+
+def _is_top_like_prediction(classification):
+    item_type = str(classification.get("type") or "").strip().lower()
+    category = str(classification.get("category") or "").strip().lower()
+    return category in {"tops", "outerwear"} or item_type in TOP_LIKE_TYPES
+
+
+def _is_confident_lower_body_pants(classification):
+    if not classification or not classification.get("ok"):
+        return False
+    item_type = str(classification.get("type") or "").strip().lower()
+    if item_type not in LOWER_BODY_PRIORITY_TYPES:
+        return False
+    confidence = float(classification.get("confidence", 0.0))
+    return confidence >= LOWER_BODY_CONFIDENCE_MIN
+
+
+def _should_prefer_lower_body_pants(top_result, lower_body_result):
+    """
+    If full image predicts a top but lower-body crop strongly predicts pants,
+    prefer lower-body subtype result.
+    """
+    if not top_result or not top_result.get("ok") or not _is_top_like_prediction(top_result):
+        return False
+    if not _is_confident_lower_body_pants(lower_body_result):
+        return False
+
+    top_conf = float(top_result.get("confidence", 0.0))
+    lower_conf = float(lower_body_result.get("confidence", 0.0))
+
+    if lower_conf >= LOWER_BODY_STRONG_CONFIDENCE:
+        return True
+    return lower_conf >= (top_conf + LOWER_BODY_MARGIN_MIN)
+
+
+def _classify_with_retries(image_path):
+    first_attempt = classify_image(image_path, crop_mode="original")
+    attempts_by_mode = {"original": first_attempt}
+
+    if first_attempt.get("ok"):
+        if _is_top_like_prediction(first_attempt):
+            lower_body_attempt = classify_image(image_path, crop_mode="lower_body")
+            attempts_by_mode["lower_body"] = lower_body_attempt
+            if _should_prefer_lower_body_pants(first_attempt, lower_body_attempt):
+                logger.info(
+                    "[classify] lower-body rescue original=%s(%.2f%%) -> lower=%s(%.2f%%)",
+                    first_attempt.get("type"),
+                    float(first_attempt.get("confidence", 0.0)) * 100,
+                    lower_body_attempt.get("type"),
+                    float(lower_body_attempt.get("confidence", 0.0)) * 100,
+                )
+                return lower_body_attempt
+        return first_attempt
+
+    failures = [first_attempt]
+    if not _is_retryable_failure(first_attempt):
+        return first_attempt
+
+    successes = []
+    for crop_mode in RETRY_CROP_MODES:
+        attempt = classify_image(image_path, crop_mode=crop_mode)
+        attempts_by_mode[crop_mode] = attempt
+        if attempt.get("ok"):
+            successes.append(attempt)
+            continue
+        failures.append(attempt)
+
+    if successes:
+        best_result = _pick_best_success(successes)
+        lower_body_attempt = attempts_by_mode.get("lower_body")
+        if _should_prefer_lower_body_pants(best_result, lower_body_attempt):
+            logger.info(
+                "[classify] lower-body rescue retry=%s(%.2f%%) -> lower=%s(%.2f%%)",
+                best_result.get("type"),
+                float(best_result.get("confidence", 0.0)) * 100,
+                lower_body_attempt.get("type"),
+                float(lower_body_attempt.get("confidence", 0.0)) * 100,
+            )
+            return lower_body_attempt
+        logger.info(
+            "[classify] retry succeeded type=%s conf=%.2f%%",
+            best_result.get("type"),
+            float(best_result.get("confidence", 0.0)) * 100,
+        )
+        return best_result
+
+    final_failure = max(failures, key=_failure_rank)
+    return final_failure
+
+
 def analyze_clothing(image_path):
     """
     Full AI pipeline: classify + color extract + occasion tag.
     """
-    classification = classify_image(image_path)
+    classification = _classify_with_retries(image_path)
     if not classification.get("ok"):
         classifier_error = classification.get("error", "classification_failed")
-        if classifier_error == "low_confidence":
-            message = (
-                "The image appears ambiguous (multiple garment cues). "
-                "Try a tighter single-item crop for better classification."
-            )
+        if classifier_error in {"low_confidence", "shirt_vs_outerwear_ambiguity"}:
+            message = "AI retry failed, try a tighter crop / single-item image"
         else:
             message = "Could not classify this image."
         logger.warning(

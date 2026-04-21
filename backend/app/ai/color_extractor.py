@@ -13,6 +13,10 @@ import numpy as np
 import colorsys
 import logging
 from sklearn.cluster import KMeans
+try:
+    from PIL import Image
+except Exception:  # pragma: no cover
+    Image = None
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,31 @@ def _extraction_failure(reason: str, image_path: str):
         "color_name": None,
         "delta_e_spread": None,
     }
+
+
+def _read_image_bgr_with_fallback(image_path: str):
+    """
+    Read image as BGR for OpenCV/LAB pipeline.
+    Tries OpenCV first; falls back to PIL decode (useful for AVIF on some builds).
+    """
+    bgr = cv2.imread(image_path)
+    if bgr is not None:
+        return bgr, None
+
+    if Image is None:
+        return None, "opencv_decode_failed"
+
+    try:
+        with Image.open(image_path) as pil_img:
+            rgb = np.array(pil_img.convert("RGB"))
+        if rgb.size == 0:
+            return None, "opencv_and_pil_decode_failed"
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        logger.info("[color] OpenCV decode failed; PIL fallback succeeded: %s", image_path)
+        return bgr, None
+    except Exception as e:
+        logger.warning("[color] PIL fallback decode failed for %s: %s", image_path, e)
+        return None, "opencv_and_pil_decode_failed"
 
 
 # ── Colour Space Conversions ──────────────────────────────────────
@@ -327,10 +356,10 @@ def extract_colors(image_path: str, clothing_type: str = None) -> dict:
           "delta_e_spread":   float,
         }
     """
-    bgr = cv2.imread(image_path)
+    bgr, decode_error = _read_image_bgr_with_fallback(image_path)
     if bgr is None:
-        logger.warning(f"[color] Cannot read image: {image_path}")
-        return _extraction_failure("image_read_failed", image_path)
+        logger.warning("[color] Cannot decode image: %s (reason=%s)", image_path, decode_error)
+        return _extraction_failure("image_decode_failed", image_path)
 
     # Resize to keep color structure while staying fast
     bgr = cv2.resize(bgr, (150, 150), interpolation=cv2.INTER_AREA)

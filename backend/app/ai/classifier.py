@@ -1,231 +1,586 @@
 """
-classifier.py — Local MobileNetV2 clothing classifier.
+classifier.py — Local clothing classifier with project-compatible output labels.
 
-Uses ImageNet pre-trained weights with a label mapping to clothing categories.
-Runs 100% locally on CPU (~60ms per image on i5-12th gen).
-No API keys, no fallback heuristics, no network calls.
+Drop-in replacement for backend/app/ai/classifier.py
 
-If a fine-tuned model exists at weights/clothing_classifier.pt, it is loaded
-instead for higher accuracy.
+Design goals:
+- Keep backend/frontend compatibility by returning existing subtype labels:
+  tshirt, shirt, formal_shirt, hoodie, sweater,
+  blazer, jacket, coat,
+  jeans, formal_pants, cargo_pants, track_pants, shorts, skirt, pyjama,
+  sneakers, shoes, loafers, sandals, slippers,
+  watch, unknown
+- Keep broad bucket in `category`
+- Keep local PyTorch inference
+- Use official TorchVision weight preprocessing when using built-in models
+- Prefer custom fine-tuned TorchScript model if present:
+    weights/clothing_classifier.pt
+    weights/class_index.json
 """
+
 import json
 import logging
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import torch
-    from PIL import Image
+    import torch.nn.functional as F
+    from PIL import Image, ImageOps
     from torchvision import models, transforms
+
     _ML_STACK_AVAILABLE = True
-except Exception:  # pragma: no cover - environment dependent
+except Exception:  # pragma: no cover
     torch = None
+    F = None
     Image = None
+    ImageOps = None
     models = None
     transforms = None
     _ML_STACK_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ──────────────────────────────────────────────────────
+# -------------------------------------------------------------------
+# Basic config
+# -------------------------------------------------------------------
+
 IMG_SIZE = 224
-MEAN = [0.485, 0.456, 0.406]   # ImageNet normalization
+MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
 DEVICE = torch.device("cpu") if torch is not None else None
-CONF_THRESH = 0.15  # Lower threshold for ImageNet zero-shot (multi-class)
-
 WEIGHTS_DIR = Path(__file__).parent / "weights"
 
-# ── ImageNet label → clothing category mapping ────────────────────
-# These are the ImageNet class indices that correspond to clothing items.
-# MobileNetV2 recognizes these out of the box.
-IMAGENET_CLOTHING_MAP = {
+# Environment switches
+ALLOW_MODEL_DOWNLOAD = os.getenv("ALLOW_MODEL_DOWNLOAD", "1").strip() == "1"
+REQUESTED_BACKBONE = os.getenv("CLOTHING_BACKBONE", "efficientnet_v2_s").strip().lower()
+ENABLE_TTA = os.getenv("CLOTHING_TTA", "0").strip() == "1"
+
+# Confidence gates for official-backbone remapping
+STRICT_TOTAL_MASS_MIN = 0.15
+STRICT_BEST_SCORE_MIN = 0.10
+SALVAGE_TOTAL_MASS_MIN = 0.10
+SALVAGE_BEST_SCORE_MIN = 0.07
+SALVAGE_GAP_MIN = 0.025
+SALVAGE_RATIO_MIN = 1.45
+
+# -------------------------------------------------------------------
+# Output taxonomy
+# -------------------------------------------------------------------
+
+CATEGORY_MAP = {
     # Tops
-    610: "shirt",        # "jersey, T-shirt"
-    617: "shirt",        # "academic gown" (robe-like, map to shirt)
-    834: "shirt",        # "suit"
-    906: "shirt",        # "Windsor tie" → signals formal top
-    # T-shirts
-    610: "tshirt",       # "jersey, T-shirt, tee shirt"
-    # Pants / Jeans
-    474: "jeans",        # "jean, blue jean, denim"
-    # Jacket / Outerwear
-    568: "jacket",       # "fur coat"
-    831: "jacket",       # "trench coat"
-    # Dress
-    578: "dress",        # "gown" / academic
-    617: "dress",        # "overskirt"
-    # Sweater
-    567: "sweater",      # "cardigan" (close enough)
-    # Shoes / Footwear
-    770: "shoes",        # "running shoe"
-    514: "shoes",        # "clog"
-    630: "shoes",        # "loafer"
-    788: "shoes",        # "sandal"
-    812: "shoes",        # "cowboy boot"
-    # Accessories
-    515: "cap",          # "cowboy hat"
-    808: "cap",          # "sombrero"
-    # More items
-    638: "bag",          # "mailbag"
-    414: "bag",          # "backpack"
-    892: "watch",        # "wall clock" (not perfect but reasonable)
+    "tshirt": "tops",
+    "shirt": "tops",
+    "formal_shirt": "tops",
+    "hoodie": "tops",
+    "sweater": "tops",
+
+    # Outerwear
+    "blazer": "outerwear",
+    "jacket": "outerwear",
+    "coat": "outerwear",
+
+    # Bottoms
+    "jeans": "bottoms",
+    "formal_pants": "bottoms",
+    "cargo_pants": "bottoms",
+    "track_pants": "bottoms",
+    "shorts": "bottoms",
+    "skirt": "bottoms",
+    "pyjama": "bottoms",
+
+    # Footwear
+    "sneakers": "footwear",
+    "shoes": "footwear",
+    "loafers": "footwear",
+    "sandals": "footwear",
+    "slippers": "footwear",
+
+    # Allowed accessory
+    "watch": "watch",
+
+    "unknown": "other",
 }
 
-# Order-dependent keyword mapping for ImageNet class names.
-# IMPORTANT: More specific phrases MUST come before generic ones.
-# e.g. "lab coat" before "coat", "bow tie" before "tie", etc.
-# Tuned based on actual MobileNetV2 output for real clothing photos.
-LABEL_KEYWORDS_ORDERED = [
-    # ── Most specific first ──
-    ("lab coat", "shirt"),           # White shirts often classified as lab coats
-    ("trench coat", "shirt"),        # Button-up shirts often trigger "trench coat"
-    ("military uniform", "shirt"),   # Structured shirts
-    ("academic gown", "shirt"),      # Flowing tops
-    ("bow tie", "shirt"),            # Signals formal top (shirt with bow tie)
-    ("bolo tie", "shirt"),           # Signals shirt
-    ("windsor tie", "shirt"),        # Signals formal shirt
-    ("vestment", "shirt"),           # Formal/religious garments → shirt
-    ("fur coat", "jacket"),          # Actual fur jacket
-    ("running shoe", "sneakers"),
-    ("cowboy hat", "cap"),
-    ("cowboy boot", "shoes"),
-    ("swimming trunks", "shorts"),
-    # ── T-shirts / Tops ──
-    ("jersey", "tshirt"),
-    ("t-shirt", "tshirt"),
-    ("tee shirt", "tshirt"),
-    ("maillot", "tshirt"),           # Tank top / athletic top
-    # ── Shirts ──
-    ("polo shirt", "shirt"),
-    ("shirt", "shirt"),
-    ("blouse", "shirt"),
-    ("polo", "shirt"),
-    # ── Formal ──
-    ("suit", "formal_pants"),        # Suit usually shows full body with pants
-    ("blazer", "blazer"),
-    ("waistcoat", "blazer"),
-    # ── Outerwear ──
-    ("parka", "jacket"),
-    ("poncho", "jacket"),
-    ("cloak", "jacket"),
-    ("jacket", "jacket"),
-    ("puffer", "jacket"),
-    ("windbreaker", "jacket"),
-    ("coat", "jacket"),              # Generic coat — after specific coats above
-    # ── Sweaters / Knit ──
-    ("cardigan", "sweater"),
-    ("pullover", "sweater"),
-    ("sweater", "sweater"),
-    ("sweatshirt", "hoodie"),
-    ("hoodie", "hoodie"),
-    # ── Bottoms ──
-    ("jean", "jeans"),
-    ("denim", "jeans"),
-    ("cargo", "cargo_pants"),
-    ("utility pants", "cargo_pants"),
-    ("pocketed pants", "cargo_pants"),
-    ("sweatpants", "track_pants"),
-    ("jogger", "track_pants"),
-    ("track pants", "track_pants"),
-    ("trouser", "formal_pants"),
-    ("slack", "formal_pants"),
-    ("short", "shorts"),
-    ("pajama", "pyjama"),
-    # ── Dresses / Skirts ──
-    ("miniskirt", "skirt"),
-    ("overskirt", "skirt"),
-    ("skirt", "skirt"),
-    ("gown", "dress"),
-    ("dress", "dress"),
-    ("abaya", "dress"),
-    ("bikini", "dress"),
-    # ── Footwear ──
-    ("sneaker", "sneakers"),
-    ("loafer", "loafers"),
-    ("boot", "shoes"),
-    ("shoe", "shoes"),
-    ("sandal", "sandals"),
-    ("slipper", "slippers"),
-    ("clog", "shoes"),
-    ("sock", "socks"),
-    # ── Hats ──
-    ("sombrero", "cap"),
-    ("hat", "cap"),
-    ("cap", "cap"),
-    ("bearskin", "cap"),
-    # ── Accessories ──
-    ("sunglasses", "accessories"),
-    ("sunglass", "accessories"),
-    ("eyewear", "accessories"),
-    ("stethoscope", "accessories"),
-    ("backpack", "bag"),
-    ("handbag", "bag"),
-    ("purse", "bag"),
-    ("bag", "bag"),
-    ("watch", "watch"),
-    ("clock", "watch"),
-    ("belt", "belt"),
-    ("band", "belt"),
-    ("ring", "ring"),
-    ("chain", "chain"),
-    ("necklace", "chain"),
-    ("bracelet", "bracelet"),
-    ("wristband", "bracelet"),
-    ("tie", "tie"),                  # Generic tie — after specific ties above
-    ("stole", "scarf"),
-    ("scarf", "scarf"),
-    ("bib", "accessories"),
-    ("apron", "accessories"),
-    # ── Traditional / Ethnic ──
-    ("kurta", "kurta"),
-    ("tunic", "kurta"),
-    ("sherwani", "sherwani"),
-    # ── Sportswear ──
-    ("swimming", "sportswear"),
-    # ── Skip these ──
-    ("diaper", "unknown"),
-    ("brassiere", "unknown"),
-    ("dumbbell", "tshirt"),          # Person lifting weights → usually wearing tshirt
-    ("barbell", "tshirt"),           # Same — gym context = tshirt
-    ("racket", "sportswear"),        # Sports context
-    ("velvet", "shirt"),             # Fabric texture, usually on tops
-]
-
-# Style mapping
 STYLE_MAP = {
-    "tshirt": "casual", "shirt": "semi-formal", "formal_shirt": "formal",
-    "blazer": "formal", "coat": "formal",
-    "jacket": "casual", "hoodie": "casual", "sweater": "casual",
-    "kurta": "traditional", "sherwani": "traditional",
-    "jeans": "casual", "formal_pants": "formal", "cargo_pants": "casual",
-    "track_pants": "casual", "shorts": "casual", "pyjama": "casual",
-    "dress": "semi-formal", "skirt": "semi-formal",
-    "sneakers": "casual", "loafers": "semi-formal", "shoes": "formal",
-    "sandals": "casual", "slippers": "casual",
-    "sportswear": "athletic", "tracksuit": "athletic",
-    "watch": "accessory", "belt": "accessory", "cap": "casual",
-    "socks": "accessory", "ring": "accessory", "chain": "accessory",
-    "bracelet": "accessory", "tie": "formal", "scarf": "casual",
-    "bag": "accessory", "accessories": "accessory",
+    # Tops
+    "tshirt": "casual",
+    "shirt": "semi-formal",
+    "formal_shirt": "formal",
+    "hoodie": "casual",
+    "sweater": "casual",
+
+    # Outerwear
+    "blazer": "formal",
+    "jacket": "casual",
+    "coat": "semi-formal",
+
+    # Bottoms
+    "jeans": "casual",
+    "formal_pants": "formal",
+    "cargo_pants": "casual",
+    "track_pants": "casual",
+    "shorts": "casual",
+    "skirt": "semi-formal",
+    "pyjama": "casual",
+
+    # Footwear
+    "sneakers": "casual",
+    "shoes": "formal",
+    "loafers": "semi-formal",
+    "sandals": "casual",
+    "slippers": "casual",
+
+    # Watch
+    "watch": "accessory",
+
     "unknown": "casual",
 }
 
-# ── Load model ONCE at module level ───────────────────────────────
+# -------------------------------------------------------------------
+# Mapping rules
+# Ordered: specific before generic
+# Tuple format: (keywords_tuple, output_type, weight)
+# -------------------------------------------------------------------
+
+LABEL_KEYWORDS_ORDERED = [
+    # --- Tops / formal tops ---
+    (("dress shirt",), "formal_shirt", 1.30),
+    (("button-down", "button down"), "formal_shirt", 1.25),
+    (("polo shirt",), "shirt", 1.20),
+    (("blouse",), "shirt", 1.15),
+    (("shirt",), "shirt", 1.00),
+
+    # Common false positives for shirts
+    (("lab coat",), "shirt", 1.10),
+    (("military uniform",), "shirt", 1.10),
+    (("academic gown",), "shirt", 0.95),
+    (("vestment",), "shirt", 0.95),
+    (("gown", "robe", "caftan", "kaftan", "abaya"), "shirt", 0.90),
+    (("bow tie",), "formal_shirt", 1.15),
+    (("bolo tie",), "formal_shirt", 1.10),
+    (("windsor tie",), "formal_shirt", 1.15),
+    (("necktie",), "formal_shirt", 1.10),
+
+    # T-shirts
+    (("t-shirt", "tee shirt", "jersey", "maillot", "tank top"), "tshirt", 1.30),
+
+    # Knit / casual top
+    (("hoodie", "sweatshirt"), "hoodie", 1.20),
+    (("cardigan", "pullover", "sweater"), "sweater", 1.15),
+
+    # --- Outerwear ---
+    (("blazer", "waistcoat"), "blazer", 1.25),
+    (("trench coat",), "coat", 1.30),
+    (("fur coat",), "coat", 1.25),
+    (("overcoat", "topcoat", "raincoat", "duffel coat", "pea coat"), "coat", 1.20),
+    (("coat",), "coat", 1.00),
+    (("parka", "poncho", "cloak", "windbreaker", "jacket", "puffer"), "jacket", 1.10),
+
+    # --- Bottoms ---
+    (("business suit",), "formal_pants", 1.20),
+    (("suit",), "formal_shirt", 0.95),
+    (("blue jean", "jean", "denim"), "jeans", 1.30),
+    (("cargo", "utility pants", "pocketed pants"), "cargo_pants", 1.25),
+    (("sweatpants", "jogger", "track pants"), "track_pants", 1.20),
+    (("trouser", "trousers", "slack", "slacks", "pant", "pants"), "formal_pants", 1.10),
+    (("swimming trunks", "shorts", "short"), "shorts", 1.15),
+    (("miniskirt", "overskirt", "skirt"), "skirt", 1.15),
+    (("pajama", "pyjama"), "pyjama", 1.10),
+
+    # --- Footwear ---
+    (("running shoe", "tennis shoe", "sneaker"), "sneakers", 1.25),
+    (("loafer",), "loafers", 1.20),
+    (("sandal",), "sandals", 1.15),
+    (("slipper",), "slippers", 1.10),
+    (("clog", "oxford", "brogue", "cowboy boot", "boot", "shoe"), "shoes", 1.00),
+
+    # --- Watch only ---
+    (("digital watch", "stopwatch", "watch"), "watch", 1.30),
+]
+
+# Ignore these accessory / non-target labels entirely.
+# You asked to remove accessories except watch.
+SKIP_KEYWORDS = (
+    "backpack",
+    "mailbag",
+    "handbag",
+    "purse",
+    "bag",
+    "belt",
+    "buckle",
+    "tie",          # handled above only via explicit formal-shirt rules
+    "scarf",
+    "stole",
+    "sombrero",
+    "beanie",
+    "beret",
+    "bonnet",
+    "hat",
+    "cap",
+    "sunglass",
+    "eyewear",
+    "ring",
+    "chain",
+    "necklace",
+    "bracelet",
+    "wristband",
+    "sock",
+    "stocking",
+    "bib",
+    "apron",
+    "brassiere",
+    "diaper",
+    "mask",
+    "wallet",
+    "wall clock",
+    "alarm clock",
+)
+
+# -------------------------------------------------------------------
+# Global state
+# -------------------------------------------------------------------
+
 _model = None
 _custom_model = False
 _class_index = None
 _model_unavailable = False
+_labels = []
+_model_name = "unloaded"
+INFER_TF = None
 
+# -------------------------------------------------------------------
+# Backbone registry
+# -------------------------------------------------------------------
+
+_BACKBONE_SPECS = {
+    "efficientnet_v2_s": {
+        "builder_name": "efficientnet_v2_s",
+        "weights_name": "EfficientNet_V2_S_Weights",
+    },
+    "convnext_tiny": {
+        "builder_name": "convnext_tiny",
+        "weights_name": "ConvNeXt_Tiny_Weights",
+    },
+    "mobilenet_v2": {
+        "builder_name": "mobilenet_v2",
+        "weights_name": "MobileNet_V2_Weights",
+    },
+}
+
+
+def _candidate_backbones():
+    ordered = []
+
+    if REQUESTED_BACKBONE in _BACKBONE_SPECS:
+        ordered.append(REQUESTED_BACKBONE)
+
+    for name in ("efficientnet_v2_s", "convnext_tiny", "mobilenet_v2"):
+        if name not in ordered:
+            ordered.append(name)
+
+    return ordered
+
+
+# -------------------------------------------------------------------
+# Helpers
+# -------------------------------------------------------------------
 
 def preload_models():
-    """Manually pre-load models to avoid lag on first request."""
-    logger.info("[classifier] Pre-loading models...")
     _ensure_model_loaded()
 
 
+def _custom_infer_transform():
+    if transforms is None:
+        return None
+
+    return transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(IMG_SIZE),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=MEAN, std=STD),
+        ]
+    )
+
+
+def _extract_logits(output):
+    if torch is None:
+        raise RuntimeError("torch unavailable")
+
+    if torch.is_tensor(output):
+        return output
+
+    if isinstance(output, dict):
+        for key in ("logits", "output", "outputs", "preds"):
+            if key in output and torch.is_tensor(output[key]):
+                return output[key]
+
+    if isinstance(output, (list, tuple)):
+        for item in output:
+            if torch.is_tensor(item):
+                return item
+
+    raise TypeError("Unsupported model output format")
+
+
+def _empty_result():
+    return {
+        "ok": False,
+        "error": "classification_failed",
+        "type": "unknown",
+        "category": "other",
+        "style": "casual",
+        "confidence": 0.0,
+        "top3": [{"type": "unknown", "score": 0.0}],
+        "label": "unknown",
+    }
+
+
+def _failure_result(
+    reason: str,
+    candidate_type: str = "unknown",
+    candidate_score: float = 0.0,
+    candidate_top3=None,
+    extra: dict | None = None,
+):
+    result = _empty_result()
+    result["error"] = reason or "classification_failed"
+    normalized_candidate = _normalize_type(candidate_type)
+    if normalized_candidate != "unknown":
+        result["type"] = normalized_candidate
+        result["category"] = _category_for(normalized_candidate)
+        result["style"] = _style_for(normalized_candidate)
+        result["confidence"] = round(float(candidate_score), 4)
+        result["label"] = f"{_model_name}:{normalized_candidate}"
+    if candidate_top3:
+        result["top3"] = candidate_top3
+    if extra:
+        result.update(extra)
+    return result
+
+
+def _normalize_type(value: str) -> str:
+    if not value:
+        return "unknown"
+
+    item_type = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+
+    aliases = {
+        # Tops
+        "tee": "tshirt",
+        "tee_shirt": "tshirt",
+        "t_shirt": "tshirt",
+        "tshirt": "tshirt",
+        "shirt": "shirt",
+        "formalshirt": "formal_shirt",
+        "formal_shirt": "formal_shirt",
+        "hoodie": "hoodie",
+        "sweatshirt": "hoodie",
+        "sweater": "sweater",
+        "cardigan": "sweater",
+        "pullover": "sweater",
+
+        # Outerwear
+        "blazer": "blazer",
+        "jacket": "jacket",
+        "coat": "coat",
+        "trench_coat": "coat",
+        "overcoat": "coat",
+
+        # Bottoms
+        "jeans": "jeans",
+        "jean": "jeans",
+        "formal_pants": "formal_pants",
+        "formalpants": "formal_pants",
+        "suit": "formal_pants",
+        "pants": "formal_pants",
+        "pant": "formal_pants",
+        "trousers": "formal_pants",
+        "trouser": "formal_pants",
+        "slacks": "formal_pants",
+        "slack": "formal_pants",
+        "cargo_pants": "cargo_pants",
+        "cargopants": "cargo_pants",
+        "track_pants": "track_pants",
+        "trackpants": "track_pants",
+        "joggers": "track_pants",
+        "jogger": "track_pants",
+        "short": "shorts",
+        "shorts": "shorts",
+        "skirt": "skirt",
+        "pyjama": "pyjama",
+        "pajama": "pyjama",
+
+        # Footwear
+        "sneaker": "sneakers",
+        "sneakers": "sneakers",
+        "shoe": "shoes",
+        "shoes": "shoes",
+        "loafer": "loafers",
+        "loafers": "loafers",
+        "sandal": "sandals",
+        "sandals": "sandals",
+        "slipper": "slippers",
+        "slippers": "slippers",
+        "boot": "shoes",
+        "boots": "shoes",
+        "clog": "shoes",
+        "oxford": "shoes",
+        "brogue": "shoes",
+
+        # Watch
+        "watch": "watch",
+        "watches": "watch",
+    }
+
+    normalized = aliases.get(item_type, "unknown")
+    return normalized if normalized in CATEGORY_MAP else "unknown"
+
+
+def _category_for(item_type: str) -> str:
+    return CATEGORY_MAP.get(item_type, "other")
+
+
+def _style_for(item_type: str) -> str:
+    return STYLE_MAP.get(item_type, "casual")
+
+
+def _normalize_input_image(img, image_path: str):
+    if Image is None:
+        return img
+
+    suffix = Path(image_path or "").suffix.lower()
+    has_alpha = (
+        img.mode in {"RGBA", "LA"}
+        or (img.mode == "P" and "transparency" in getattr(img, "info", {}))
+    )
+
+    # Alpha-bearing WEBP uploads often have transparent padding that distorts cues.
+    if suffix == ".webp" and has_alpha:
+        neutral_bg = Image.new("RGBA", img.size, (242, 242, 242, 255))
+        composited = Image.alpha_composite(neutral_bg, img.convert("RGBA"))
+        return composited.convert("RGB")
+
+    return img.convert("RGB")
+
+
+def _build_top3(ranked, raw_scores, limit=3):
+    return [
+        {
+            "type": item_type,
+            "score": round(float(raw_scores.get(item_type, 0.0)), 4),
+        }
+        for item_type, _ in ranked[:limit]
+    ]
+
+
+def _is_salvage_candidate(total_mass: float, best_score: float, runner_up_score: float) -> bool:
+    if total_mass < SALVAGE_TOTAL_MASS_MIN or best_score < SALVAGE_BEST_SCORE_MIN:
+        return False
+    confidence_gap = best_score - runner_up_score
+    lead_ratio = best_score / max(runner_up_score, 1e-6)
+    return confidence_gap >= SALVAGE_GAP_MIN and lead_ratio >= SALVAGE_RATIO_MIN
+
+
+def _map_label_to_type(label_name: str):
+    label_lower = label_name.lower()
+
+    # allow explicit formal-shirt rules before broad skip of "tie"
+    if "bow tie" in label_lower:
+        return "formal_shirt", 1.15
+    if "bolo tie" in label_lower:
+        return "formal_shirt", 1.10
+    if "windsor tie" in label_lower:
+        return "formal_shirt", 1.15
+    if "necktie" in label_lower:
+        return "formal_shirt", 1.10
+
+    if any(skip in label_lower for skip in SKIP_KEYWORDS):
+        return "unknown", 0.0
+
+    for keywords, item_type, weight in LABEL_KEYWORDS_ORDERED:
+        if any(keyword in label_lower for keyword in keywords):
+            return item_type, weight
+
+    return "unknown", 0.0
+
+
+def _get_labels():
+    return _labels if _labels else []
+
+
+def _official_weight_cache_path(weights):
+    if weights is None or torch is None:
+        return None
+
+    url = getattr(weights, "url", "") or ""
+    if not url:
+        return None
+
+    checkpoint_name = os.path.basename(urlparse(url).path)
+    if not checkpoint_name:
+        return None
+
+    return Path(torch.hub.get_dir()) / "checkpoints" / checkpoint_name
+
+
+def _load_official_backbone():
+    global _model, _custom_model, _model_unavailable, _labels, INFER_TF, _model_name
+
+    if models is None:
+        _model_unavailable = True
+        return
+
+    last_error = None
+
+    for backbone_name in _candidate_backbones():
+        spec = _BACKBONE_SPECS.get(backbone_name)
+        if spec is None:
+            continue
+
+        builder = getattr(models, spec["builder_name"], None)
+        weights_enum = getattr(models, spec["weights_name"], None)
+
+        if builder is None or weights_enum is None:
+            continue
+
+        try:
+            weights = weights_enum.DEFAULT
+            if not ALLOW_MODEL_DOWNLOAD:
+                cached_path = _official_weight_cache_path(weights)
+                if cached_path is None or not cached_path.exists():
+                    logger.info(
+                        "[classifier] Skipping %s: no cached weights and ALLOW_MODEL_DOWNLOAD=0",
+                        backbone_name,
+                    )
+                    continue
+
+            _model = builder(weights=weights)
+            _model.eval()
+
+            _custom_model = False
+            _labels = list(weights.meta.get("categories", []))
+            INFER_TF = weights.transforms()
+            _model_name = backbone_name
+            logger.info("[classifier] Loaded official backbone: %s", backbone_name)
+            return
+        except Exception as e:
+            last_error = e
+            logger.warning("[classifier] Failed to load %s: %s", backbone_name, e)
+
+            # If downloads are blocked or unavailable, try next fallback.
+            if not ALLOW_MODEL_DOWNLOAD:
+                continue
+
+    logger.warning("[classifier] Could not load any official backbone: %s", last_error)
+    _model_unavailable = True
+
+
 def _ensure_model_loaded():
-    """Lazy-load the model on first use."""
-    global _model, _custom_model, _class_index, _model_unavailable
+    global _model, _custom_model, _class_index, _model_unavailable, INFER_TF, _model_name
 
     if not _ML_STACK_AVAILABLE:
         _model_unavailable = True
@@ -237,168 +592,194 @@ def _ensure_model_loaded():
     custom_weights = WEIGHTS_DIR / "clothing_classifier.pt"
     class_index_file = WEIGHTS_DIR / "class_index.json"
 
+    # Prefer fine-tuned local model if present
     if custom_weights.exists() and class_index_file.exists():
-        logger.info("[classifier] Loading fine-tuned model from weights/")
         try:
             _model = torch.jit.load(str(custom_weights), map_location=DEVICE)
             _model.eval()
-            with open(class_index_file) as f:
+
+            with open(class_index_file, "r", encoding="utf-8") as f:
                 _class_index = json.load(f)
+
             _custom_model = True
-            logger.info("[classifier] Fine-tuned model loaded successfully.")
+            INFER_TF = _custom_infer_transform()
+            _model_name = "custom_fashion_model"
+            logger.info("[classifier] Loaded custom clothing model")
             return
         except Exception as e:
-            logger.warning(f"[classifier] Failed to load fine-tuned model: {e}")
+            logger.warning("[classifier] Failed to load custom model: %s", e)
 
-    try:
-        logger.info("[classifier] Loading pre-trained MobileNetV2 (ImageNet)...")
-        _model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-        _model.eval()
-        _custom_model = False
-        logger.info("[classifier] MobileNetV2 loaded. Using ImageNet label mapping.")
-    except Exception as e:
-        logger.warning(f"[classifier] Could not load model stack: {e}")
-        _model_unavailable = True
+    # Fallback to official TorchVision model
+    _load_official_backbone()
 
 
-# ── Inference transform ───────────────────────────────────────────
-if transforms is not None:
-    INFER_TF = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=MEAN, std=STD),
-    ])
-else:
-    INFER_TF = None
+def _run_logits(img):
+    if _model is None or INFER_TF is None:
+        raise RuntimeError("Model is not loaded")
 
-# Load ImageNet class labels
-_imagenet_labels = None
+    x = INFER_TF(img).unsqueeze(0).to(DEVICE)
 
+    with torch.inference_mode():
+        logits = _extract_logits(_model(x))
 
-def _get_imagenet_labels():
-    """Get ImageNet 1000 class labels from torchvision."""
-    global _imagenet_labels
-    if models is None:
-        return []
-    if _imagenet_labels is not None:
-        return _imagenet_labels
+        if ENABLE_TTA and ImageOps is not None:
+            x_flip = INFER_TF(ImageOps.mirror(img)).unsqueeze(0).to(DEVICE)
+            logits_flip = _extract_logits(_model(x_flip))
+            logits = (logits + logits_flip) / 2.0
 
-    # torchvision provides the label mapping via the weights meta
-    weights = models.MobileNet_V2_Weights.IMAGENET1K_V1
-    _imagenet_labels = weights.meta["categories"]
-    return _imagenet_labels
+        if logits.ndim == 2:
+            logits = logits[0]
+
+    return logits
 
 
-def _map_imagenet_to_clothing(label_name: str) -> str:
-    """Map an ImageNet class name to a clothing category."""
-    label_lower = label_name.lower()
-
-    # Check ordered keyword matches (most specific first)
-    for keyword, clothing_type in LABEL_KEYWORDS_ORDERED:
-        if keyword in label_lower:
-            return clothing_type
-
-    return "unknown"
-
+# -------------------------------------------------------------------
+# Main API
+# -------------------------------------------------------------------
 
 def classify_image(image_path: str) -> dict:
-    """
-    Classify clothing type from an image file path.
-
-    Returns:
-        {
-          "type":       str,    # "shirt" | "jeans" | "dress" | "unknown" etc.
-          "confidence": float,  # probability of top prediction
-          "top3":       list,   # [{type, score}, ...]
-          "label":      str,    # raw model label
-          "style":      str,    # "casual" | "formal" | etc.
-        }
-    """
     _ensure_model_loaded()
-    if _model_unavailable or _model is None or INFER_TF is None or Image is None or torch is None:
-        return {
-            "type": "unknown",
-            "confidence": 0.0,
-            "top3": [{"type": "unknown", "score": 0.0}],
-            "label": "unavailable_model_stack",
-            "style": "casual",
-        }
+
+    if (
+        _model_unavailable
+        or _model is None
+        or INFER_TF is None
+        or Image is None
+        or torch is None
+        or F is None
+    ):
+        return _failure_result("model_unavailable")
 
     try:
-        img = Image.open(image_path).convert("RGB")
+        img = Image.open(image_path)
+        if ImageOps is not None:
+            img = ImageOps.exif_transpose(img)
+        img = _normalize_input_image(img, image_path)
     except Exception as e:
-        logger.error(f"[classifier] Cannot open image: {e}")
-        return {
-            "type": "unknown", "confidence": 0.0,
-            "top3": [], "label": "error", "style": "casual"
-        }
+        logger.error("[classifier] Cannot open image: %s", e)
+        return _failure_result("image_open_failed")
 
-    tensor = INFER_TF(img).unsqueeze(0).to(DEVICE)
+    try:
+        logits = _run_logits(img)
+        probs = F.softmax(logits, dim=0)
+    except Exception as e:
+        logger.error("[classifier] Inference failed: %s", e)
+        return _failure_result("inference_failed")
 
-    with torch.no_grad():
-        logits = _model(tensor)
-        probs = torch.softmax(logits, dim=1)[0]
-
+    # ---------------------------------------------------------------
+    # Custom model path
+    # ---------------------------------------------------------------
     if _custom_model and _class_index:
-        # Fine-tuned model: direct class mapping
         top3_idx = torch.argsort(probs, descending=True)[:3]
-        top3 = [
-            {"type": _class_index.get(str(i.item()), "unknown"),
-             "score": round(probs[i].item(), 4)}
-            for i in top3_idx
-        ]
-        best_type = top3[0]["type"]
-        best_score = top3[0]["score"]
-    else:
-        # ImageNet model: map labels to clothing categories
-        labels = _get_imagenet_labels()
+        top3 = []
 
-        # Get top-20 predictions and map to clothing
-        top20_idx = torch.argsort(probs, descending=True)[:20]
-        clothing_scores = {}
+        for idx in top3_idx:
+            raw_type = _class_index.get(str(idx.item()), "unknown")
+            item_type = _normalize_type(raw_type)
+            if item_type == "unknown":
+                continue
 
-        for idx in top20_idx:
-            label_name = labels[idx.item()]
-            clothing_type = _map_imagenet_to_clothing(label_name)
-            score = probs[idx].item()
-
-            if clothing_type != "unknown":
-                if clothing_type not in clothing_scores:
-                    clothing_scores[clothing_type] = {
-                        "score": score,
-                        "label": label_name
-                    }
-                else:
-                    # Accumulate scores for same clothing type
-                    clothing_scores[clothing_type]["score"] += score
-
-        if clothing_scores:
-            # Sort by accumulated score
-            sorted_types = sorted(
-                clothing_scores.items(),
-                key=lambda x: x[1]["score"],
-                reverse=True
+            top3.append(
+                {
+                    "type": item_type,
+                    "score": round(float(probs[idx].item()), 4),
+                }
             )
 
-            top3 = [
-                {"type": t, "score": round(s["score"], 4)}
-                for t, s in sorted_types[:3]
-            ]
-            best_type = sorted_types[0][0]
-            best_score = sorted_types[0][1]["score"]
-        else:
-            # No clothing detected — return best ImageNet class
-            best_idx = torch.argmax(probs).item()
-            best_label = labels[best_idx]
-            best_score = probs[best_idx].item()
-            best_type = "unknown"
-            top3 = [{"type": "unknown", "score": round(best_score, 4)}]
+        if not top3:
+            return _failure_result("unmapped_custom_prediction")
 
+        best_type = top3[0]["type"]
+        best_score = top3[0]["score"]
+
+        return {
+            "ok": True,
+            "type": best_type,
+            "category": _category_for(best_type),
+            "style": _style_for(best_type),
+            "confidence": round(float(best_score), 4),
+            "top3": top3,
+            "label": f"{_model_name}:{best_type}",
+        }
+
+    # ---------------------------------------------------------------
+    # Official ImageNet backbone path
+    # ---------------------------------------------------------------
+    labels = _get_labels()
+    if not labels:
+        return _failure_result("model_labels_missing")
+
+    topk = min(30, probs.numel())
+    topk_idx = torch.argsort(probs, descending=True)[:topk]
+
+    weighted_scores = {}
+    raw_scores = {}
+
+    for idx in topk_idx:
+        raw_label = labels[idx.item()]
+        item_type, weight = _map_label_to_type(raw_label)
+        if item_type == "unknown":
+            continue
+
+        score = float(probs[idx].item())
+        weighted_scores[item_type] = weighted_scores.get(item_type, 0.0) + (score * weight)
+        raw_scores[item_type] = raw_scores.get(item_type, 0.0) + score
+
+    if not weighted_scores:
+        return _failure_result("no_supported_garment_detected")
+
+    ranked = sorted(weighted_scores.items(), key=lambda x: x[1], reverse=True)
+
+    best_type = ranked[0][0]
+    best_score = raw_scores.get(best_type, 0.0)
+    total_mass = sum(raw_scores.values())
+
+    # Near-tie adjustment using raw mass
+    if len(ranked) >= 2:
+        a_type, a_sel = ranked[0]
+        b_type, b_sel = ranked[1]
+        if abs(a_sel - b_sel) < 0.025 and raw_scores.get(b_type, 0.0) > raw_scores.get(a_type, 0.0):
+            ranked[0], ranked[1] = ranked[1], ranked[0]
+            best_type = ranked[0][0]
+            best_score = raw_scores.get(best_type, 0.0)
+
+    runner_up_type = ranked[1][0] if len(ranked) > 1 else "unknown"
+    runner_up_score = raw_scores.get(runner_up_type, 0.0)
+    normalized_best_type = _normalize_type(best_type)
+    top3 = _build_top3(ranked, raw_scores, limit=3)
+
+    # Weak-evidence rejection
+    if total_mass < STRICT_TOTAL_MASS_MIN or best_score < STRICT_BEST_SCORE_MIN:
+        if _is_salvage_candidate(total_mass, best_score, runner_up_score):
+            return {
+                "ok": True,
+                "type": normalized_best_type,
+                "category": _category_for(normalized_best_type),
+                "style": _style_for(normalized_best_type),
+                "confidence": round(float(best_score), 4),
+                "top3": top3,
+                "label": f"{_model_name}:{normalized_best_type}",
+                "salvaged": True,
+            }
+        return _failure_result(
+            "low_confidence",
+            candidate_type=normalized_best_type,
+            candidate_score=best_score,
+            candidate_top3=top3,
+            extra={
+                "total_mass": round(float(total_mass), 4),
+                "runner_up_type": runner_up_type,
+                "runner_up_score": round(float(runner_up_score), 4),
+                "confidence_gap": round(float(best_score - runner_up_score), 4),
+            },
+        )
 
     return {
-        "type": best_type,
-        "confidence": round(best_score, 4),
+        "ok": True,
+        "type": normalized_best_type,
+        "category": _category_for(normalized_best_type),
+        "style": _style_for(normalized_best_type),
+        "confidence": round(float(best_score), 4),
         "top3": top3,
-        "label": f"mobilenet_{best_type}",
-        "style": STYLE_MAP.get(best_type, "casual"),
+        "label": f"{_model_name}:{normalized_best_type}",
     }

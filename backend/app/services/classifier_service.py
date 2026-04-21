@@ -1,44 +1,27 @@
 """
-classifier_service.py — Thin orchestrator for clothing analysis.
-
-Calls:
-  - app.ai.classifier.classify_image()    → MobileNetV2 local inference
-  - app.ai.color_extractor.extract_colors() → CIELAB KMeans++ colour extraction
-
-Exposes analyze_clothing(image_path) for backward compatibility with routes.
+classifier_service.py - Thin orchestrator for clothing analysis.
 """
 import colorsys
 import logging
 
 from app.ai.classifier import classify_image
-from app.ai.color_extractor import extract_colors, get_color_name
+from app.ai.color_extractor import extract_colors
 
 logger = logging.getLogger(__name__)
 
-
-# Style hints from clothing type (used for occasion tagging)
-STYLE_MAP = {
-    "tshirt": "casual", "shirt": "semi-formal", "formal_shirt": "formal",
-    "blazer": "formal", "coat": "formal",
-    "jacket": "casual", "hoodie": "casual", "sweater": "casual",
-    "kurta": "traditional", "sherwani": "traditional",
-    "jeans": "casual", "formal_pants": "formal", "cargo_pants": "casual",
-    "shorts": "casual", "track_pants": "casual", "pyjama": "casual",
-    "dress": "semi-formal", "skirt": "semi-formal",
-    "sneakers": "casual", "loafers": "semi-formal", "shoes": "formal",
-    "sandals": "casual", "slippers": "casual",
-    "sportswear": "athletic", "tracksuit": "athletic",
-    "watch": "accessory", "belt": "accessory", "cap": "casual",
-    "socks": "accessory", "ring": "accessory", "chain": "accessory",
-    "bracelet": "accessory", "tie": "formal", "scarf": "casual",
-    "bag": "accessory", "accessories": "accessory",
-    "unknown": "casual",
+STYLE_TAGS = {
+    "formal": ["formal", "business", "office"],
+    "semi-formal": ["semi-formal", "office", "casual"],
+    "casual": ["casual", "everyday"],
+    "traditional": ["traditional", "festive", "wedding"],
+    "athletic": ["athletic", "gym", "sports"],
+    "accessory": ["accessory"],
 }
 
 
 def _color_formality(hsv):
-    """Determine colour formality based on HSV values."""
-    h, s, v = hsv
+    """Determine color formality based on HSV values."""
+    _, s, v = hsv
     if v < 35 and s < 20:
         return "formal"
     if v < 35:
@@ -48,78 +31,109 @@ def _color_formality(hsv):
     return "neutral"
 
 
-def _get_occasion_tags(clothing_type, primary_rgb):
-    """Generate occasion tags from type + colour."""
-    style = STYLE_MAP.get(clothing_type, "casual")
-
-    base_tags = {
-        "formal": ["formal", "business", "office"],
-        "semi-formal": ["semi-formal", "office", "casual"],
-        "casual": ["casual", "everyday"],
-        "traditional": ["traditional", "festive", "wedding"],
-        "athletic": ["athletic", "gym", "sports"],
-        "accessory": ["accessory"],
+def _normalize_style(style):
+    normalized = str(style or "casual").strip().lower().replace("_", "-")
+    aliases = {
+        "semiformal": "semi-formal",
+        "semi formal": "semi-formal",
     }
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in STYLE_TAGS else "casual"
 
-    tags = set(base_tags.get(style, ["casual"]))
 
-    # Colour-based formality adjustment
+def _get_occasion_tags(style, primary_rgb):
+    """Generate occasion tags from classifier style + dominant color."""
+    tags = set(STYLE_TAGS.get(style, STYLE_TAGS["casual"]))
+
+    if not primary_rgb or len(primary_rgb) < 3:
+        return list(tags)
+
     r, g, b = primary_rgb[0] / 255, primary_rgb[1] / 255, primary_rgb[2] / 255
     h, s, v = colorsys.rgb_to_hsv(r, g, b)
     hsv_scaled = [h * 360, s * 100, v * 100]
     formality = _color_formality(hsv_scaled)
 
-    if formality == "formal":
+    if formality == "formal" and style in {"formal", "semi-formal", "casual"}:
         tags.add("formal")
         tags.discard("athletic")
-    elif formality == "casual":
+    elif formality == "casual" and style != "formal":
         tags.add("casual")
 
     return list(tags)
 
 
+def _analysis_failure(code, message, classification=None, color_result=None):
+    payload = {
+        "ok": False,
+        "error": code,
+        "message": message,
+    }
+    if classification is not None:
+        payload["classification_details"] = classification
+    if color_result is not None:
+        payload["color_details"] = color_result
+    return payload
+
+
 def analyze_clothing(image_path):
     """
-    Full AI pipeline: classify + colour extract + occasion tag.
-
-    Args:
-        image_path: Path to the uploaded image file.
-
-    Returns:
-        {
-          "type": str,
-          "style": str,
-          "colors": [[r,g,b], ...],
-          "primary_color": [r,g,b],
-          "color_name": str,
-          "secondary_colors": [[r,g,b], ...],
-          "occasion_tags": [str, ...],
-          "classification_details": {...},
-        }
+    Full AI pipeline: classify + color extract + occasion tag.
     """
-    # Step 1: Classify clothing type (MobileNetV2)
     classification = classify_image(image_path)
+    if not classification.get("ok"):
+        classifier_error = classification.get("error", "classification_failed")
+        if classifier_error == "low_confidence":
+            message = (
+                "The image appears ambiguous (multiple garment cues). "
+                "Try a tighter single-item crop for better classification."
+            )
+        else:
+            message = "Could not classify this image."
+        logger.warning(
+            "[classify] failed error=%s type=%s",
+            classifier_error,
+            classification.get("type"),
+        )
+        return _analysis_failure(
+            classifier_error,
+            message,
+            classification=classification,
+        )
+
+    item_type = classification.get("type", "unknown")
+    style = _normalize_style(classification.get("style", "casual"))
+    category = classification.get("category")
+
     logger.info(
-        f"[classify] type={classification['type']} "
-        f"conf={classification['confidence']:.2%}"
+        "[classify] type=%s category=%s conf=%.2f%%",
+        item_type,
+        category,
+        float(classification.get("confidence", 0.0)) * 100,
     )
 
-    # Step 2: Extract colours (CIELAB KMeans++)
-    color_result = extract_colors(image_path)
-    primary_color = color_result["primary_color"]
-    secondary_colors = color_result["secondary_colors"]
-    color_name = color_result["color_name"]
-    logger.info(f"[color] name={color_name} rgb={primary_color}")
+    color_result = extract_colors(image_path, clothing_type=item_type)
+    if not color_result.get("ok"):
+        logger.warning("[color] failed error=%s", color_result.get("error"))
+        return _analysis_failure(
+            "color_extraction_failed",
+            "Could not extract colors from this image.",
+            classification=classification,
+            color_result=color_result,
+        )
 
-    # Step 3: Occasion tags
-    occasion_tags = _get_occasion_tags(classification["type"], primary_color)
+    primary_color = color_result.get("primary_color")
+    secondary_colors = color_result.get("secondary_colors", [])
+    color_name = color_result.get("color_name")
 
-    # Build colours list for backward compat
+    logger.info("[color] name=%s rgb=%s", color_name, primary_color)
+
+    occasion_tags = _get_occasion_tags(style, primary_color)
     all_colors = [primary_color] + secondary_colors
 
-    return {
-        "type": classification["type"],
-        "style": classification.get("style", "casual"),
+    result = {
+        "ok": True,
+        "type": item_type,
+        "style": style,
         "colors": all_colors,
         "primary_color": primary_color,
         "color_name": color_name,
@@ -127,3 +141,8 @@ def analyze_clothing(image_path):
         "occasion_tags": occasion_tags,
         "classification_details": classification,
     }
+
+    if category:
+        result["category"] = category
+
+    return result

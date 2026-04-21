@@ -14,6 +14,21 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const hasGoogleAuth = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
+  const inputStyle = `
+    w-full pl-14 pr-6 py-3.5
+    bg-white/[0.03]
+    border border-white/10
+    rounded-2xl
+    focus:outline-none
+    focus:ring-2 focus:ring-primary/20
+    focus:border-primary/40
+    focus:bg-white/[0.05]
+    text-text
+    placeholder:text-text-muted/30
+    transition-all
+    font-medium
+  `;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -102,13 +117,11 @@ export default function Login() {
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-text-muted/70 ml-1 uppercase tracking-[0.2em]">Email Address</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted/50 group-focus-within:text-primary transition-colors">
-                    <Mail className="w-5 h-5" />
-                  </div>
+                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted/70 group-focus-within:text-primary transition-colors" />
                   <input
                     type="email"
                     required
-                    className="w-full pl-14 pr-6 py-3.5 bg-card border border-border-subtle rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 text-text placeholder:text-text-muted/30 transition-all font-medium backdrop-blur-md"
+                    className={inputStyle}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
@@ -119,16 +132,13 @@ export default function Login() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-[10px] font-black text-text-muted/70 ml-1 uppercase tracking-[0.2em]">Password</label>
-                  <Link to="#" className="text-[10px] font-black text-primary hover:text-primary-hover transition-colors uppercase tracking-widest">Forgot?</Link>
                 </div>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted/50 group-focus-within:text-primary transition-colors">
-                    <Lock className="w-5 h-5" />
-                  </div>
+                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted/70 group-focus-within:text-primary transition-colors" />
                   <input
                     type="password"
                     required
-                    className="w-full pl-14 pr-6 py-3.5 bg-card border border-border-subtle rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 text-text placeholder:text-text-muted/30 transition-all font-medium backdrop-blur-md"
+                    className={inputStyle}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"

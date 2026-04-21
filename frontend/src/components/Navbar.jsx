@@ -45,7 +45,7 @@ export default function Navbar() {
                 CLOTHIFY<span className="text-primary italic">.AI</span>
               </span>
               <span className="text-[8px] text-text-muted tracking-[0.4em] font-medium uppercase -mt-1">
-                Neural Core v4.0
+                Wear Yourself
               </span>
             </div>
           </Link>
@@ -96,7 +96,7 @@ export default function Navbar() {
                   to="/register"
                   className="px-6 py-2 bg-primary text-background rounded-xl font-bold text-[10px] tracking-widest hover:shadow-[0_0_20px_#00ff88] transition-all"
                 >
-                  INITIALIZE
+                  REGISTER
                 </Link>
                 <ThemeToggle />
               </div>
@@ -146,7 +146,7 @@ export default function Navbar() {
               ) : (
                 <>
                   <Link to="/login" onClick={() => setIsOpen(false)} className="text-center font-bold text-text tracking-widest py-3 border border-border-subtle rounded-xl hover:bg-primary/10">LOGIN</Link>
-                  <Link to="/register" onClick={() => setIsOpen(false)} className="text-center font-bold text-background bg-primary tracking-widest py-3 rounded-xl shadow-[0_0_20px_#00ff88]">INITIALIZE</Link>
+                  <Link to="/register" onClick={() => setIsOpen(false)} className="text-center font-bold text-background bg-primary tracking-widest py-3 rounded-xl shadow-[0_0_20px_#00ff88]">REGISTER</Link>
                 </>
               )}
             </div>

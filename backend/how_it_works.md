@@ -1,31 +1,53 @@
-# How the WardrobeAI Local Classification Engine Works
+# How the local AI pipeline works
 
-The backend of WardrobeAI uses a dedicated AI package located in `app/ai/` to locally predict the garment **Type**, its **Color(s)**, and its **Style/Occasion**.
+This backend uses a local AI stack in `backend/app/ai/` to produce subtype classification and color metadata.
 
-## 1. Top-Level Workflow
-When an image is saved in the `/uploads/` folder and sent to the classification route (`/api/classify`):
-1. **Route Handler:** Dispatches the image path to `app.services.classifier_service.analyze_clothing()`.
-2. **Orchestrator:** `analyze_clothing` delegates out the heavy lifting:
-   - Queries `classify_image()` to get what the item is.
-   - Queries `extract_colors()` to determine the exact color palette.
-   - Computes `occasion_tags` using a combination of the item type (e.g., blazers are formal) and the color's psychological profile (e.g., dark, low saturation colors lean formal).
-3. **Response:** Merges the data into an elegant JSON structure and saves the document to MongoDB.
+## 1. Route flow (`/api/classify`)
 
-## 2. Clothing Classification (`app/ai/classifier.py`)
-This module uses a **MobileNetV2** deep learning model powered by PyTorch.
-- **Model Check:** Before inferring, the module checks the `app/ai/weights/` folder. If you ever train a custom `.pt` model for WardrobeAI and put it there, the module will auto-load it. Otherwise, it defaults to the pre-trained ImageNet model.
-- **ImageNet Zero-Shot Translation:** Since standard ImageNet wasn't trained primarily on isolated clothing pictures, an image of a white dress shirt might natively be predicted as "lab coat".
-  We built a `LABEL_KEYWORDS_ORDERED` tuple list that intercepts top-scoring predictions and strictly remaps them (e.g., "lab coat" is caught and translated to "shirt"). This yields high accuracy out-of-the-box.
+1. `backend/app/routes/classify_routes.py` resolves a local upload path.
+2. It calls `analyze_clothing(image_path)` from `backend/app/services/classifier_service.py`.
+3. On success, the route saves the wardrobe item.
+4. On AI failure, the route returns `422` and does not save placeholder results.
 
-## 3. Color Extraction (`app/ai/color_extractor.py`)
-This module is much smarter than simple pixel averaging.
-1. **Focus:** It crops to the center 60% of the image.
-2. **Perceptual Color Space:** BGR colors are notoriously bad to cluster mathematically. It converts pixels to the **CIELAB color space**, where distance metrics exactly match human vision (`Delta-E`).
-3. **Background Isolation:** It removes incredibly dark/light pixels and desaturated pixels, filtering out non-clothing artifacts (walls, shadows, pure white backgrounds).
-4. **KMeans++:** Computes `n_clusters=5` via machine learning to identify the dominant hues in the garment.
-5. **Human Mapping:** Translates the largest cluster back to an RGB format, then converts it to HSV to accurately assign 1-of-25+ human-readable labels (e.g., "Navy", "Salmon", "Lime", "Charcoal").
+## 2. Clothing classification (`backend/app/ai/classifier.py`)
 
-## 4. Dependencies
-- **PyTorch/TorchVision**: CPU-only builds used to minimize installation size.
-- **Scikit-Learn**: Used strictly for KMeans clustering.
-- **OpenCV**: Standard, fast image decoding and color-space math.
+- Prefers local custom TorchScript weights when both files exist:
+  - `weights/clothing_classifier.pt`
+  - `weights/class_index.json`
+- Otherwise falls back to official TorchVision backbones.
+- Output keeps subtype-level `type` values for compatibility.
+- Optional `category` is returned as separate broad metadata.
+
+### Download guard
+
+`ALLOW_MODEL_DOWNLOAD=0` blocks remote weight attempts.
+
+- If official weights are not already cached locally, those backbones are skipped.
+- This prevents unintended online downloads in restricted/offline environments.
+
+## 3. Color extraction (`backend/app/ai/color_extractor.py`)
+
+- Reads image with OpenCV.
+- Applies type-aware focus crop.
+- Converts to CIELAB, filters background-heavy pixels.
+- Runs KMeans++ clustering and returns dominant colors.
+
+Failure behavior:
+
+- If image read fails, returns explicit failure payload (`ok: false`, `error`).
+- No fake gray fallback is returned on read failure.
+
+## 4. Service orchestration (`backend/app/services/classifier_service.py`)
+
+- Uses classifier style output directly for style/occasion tagging.
+- Passes `category` separately from subtype `type`.
+- Returns `ok: false` on classification/color extraction failure so routes can reject invalid analysis.
+
+## 5. Data contract summary
+
+- `type`: required subtype (source of truth for wardrobe behavior)
+- `category`: optional broad grouping metadata
+- `style`: style label used by planning and UI
+- `colors` / `primary_color` / `color_name`: extracted color metadata
+
+The app must not replace subtype `type` with broad categories.

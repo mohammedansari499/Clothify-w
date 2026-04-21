@@ -24,12 +24,12 @@ const CATEGORY_CONFIG = {
   cargo_pants: { label: 'Cargo Pants', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
   shorts: { label: 'Shorts', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
   track_pants: { label: 'Track Pants', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
-  pyjama: { label: 'Kurta', icon: <Layers className="w-4 h-4" />, group: 'Traditional' },
+  pyjama: { label: 'Pyjamas', icon: <Layers className="w-4 h-4" />, group: 'Bottoms' },
   dress: { label: 'Dresses', icon: <Palette className="w-4 h-4" />, group: 'Dresses' },
   skirt: { label: 'Skirts', icon: <Palette className="w-4 h-4" />, group: 'Dresses' },
   sneakers: { label: 'Sneakers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   shoes: { label: 'Shoes', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
-  loafers: { label: 'Shoes', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
+  loafers: { label: 'Loafers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   sandals: { label: 'Sandals', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   slippers: { label: 'Slippers', icon: <Plus className="w-4 h-4" />, group: 'Footwear' },
   watch: { label: 'Watches', icon: <Plus className="w-4 h-4" />, group: 'Accessories' },
@@ -51,6 +51,7 @@ const GROUP_ORDER = ['Tops', 'Bottoms', 'Outerwear', 'Traditional', 'Dresses', '
 
 const STYLE_COLORS = {
   formal: 'from-blue-500/20 to-indigo-500/20 text-blue-400 border-blue-500/30',
+  'semi-formal': 'from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30',
   semiformal: 'from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30',
   casual: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
   traditional: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30',
@@ -63,7 +64,11 @@ function rgbToHex(r, g, b) {
 }
 
 const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
-  const styleClass = STYLE_COLORS[item.style] || STYLE_COLORS.casual;
+  const normalizedStyle = String(item.style || 'casual').toLowerCase();
+  const styleClass =
+    STYLE_COLORS[normalizedStyle] ||
+    STYLE_COLORS[normalizedStyle.replace('-', '')] ||
+    STYLE_COLORS.casual;
 
   return (
     <motion.div
@@ -123,12 +128,17 @@ const ItemCard = memo(({ item, onDelete, onMarkWorn, onResetWorn }) => {
       <div className="p-5 space-y-4 relative z-10">
         <div className="flex items-center justify-between">
           <h4 className="capitalize font-black text-sm tracking-tight text-text truncate pr-4">
-            {item.type?.replace('_', ' ')}
+            {item.type?.replaceAll('_', ' ')}
           </h4>
           {item.color_name && (
             <span className="text-[10px] font-bold text-text-muted uppercase tracking-tighter shrink-0">{item.color_name}</span>
           )}
         </div>
+        {item.category && (
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary/70">
+            Category: {item.category}
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <div className={`text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-lg border bg-gradient-to-br transition-all duration-500 ${styleClass}`}>
@@ -208,7 +218,8 @@ export default function Wardrobe() {
 
   const filteredClothes = useMemo(() => {
     return clothes.filter(item => {
-      const matchesSearch = (item.type + item.style + (item.color_name || '')).toLowerCase().includes(searchQuery.toLowerCase());
+      const searchableText = `${item.type || ''} ${item.style || ''} ${item.color_name || ''} ${item.category || ''}`;
+      const matchesSearch = searchableText.toLowerCase().includes(searchQuery.toLowerCase());
       const config = CATEGORY_CONFIG[item.type] || CATEGORY_CONFIG.unknown;
       const matchesGroup = activeGroup === 'All' || config.group === activeGroup;
       return matchesSearch && matchesGroup;

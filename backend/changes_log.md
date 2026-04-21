@@ -1,38 +1,56 @@
-# Changes Log - WardrobeAI Classification Engine Update
+# Changes log - AI contract and taxonomy alignment
 
-This document details the changes made to move WardrobeAI from a fragile, rule-based heuristic fallback system to a fully robust, local, AI-driven offline classification engine.
+## Scope
 
-## 1. Removed Legacy "Heuristic" AI Fallback
-- **Before:** The system relied on HuggingFace Inference APIs (`ViT-base-patch16-224`). When that failed (or hit rate limits), it fell back to a deeply flawed `app/services/classifier_service.py` that used OpenCV heuristics (aspect ratio, filename substrings, and simple BGR color thresholding) to guess the clothing type and color.
-- **After:** Completely removed the fragile OpenCV heuristics and the dependency on the external HF API.
+Updated only the planned files to align the local AI stack, subtype taxonomy, and API behavior.
 
-## 2. Added Local AI Module (`app/ai/`)
-- **`app/ai/classifier.py`**:
-  - Implemented a 100% local, CPU-friendly inference module using PyTorch and `MobileNetV2`.
-  - Downloads and caches pre-trained ImageNet weights (`mobilenet_v2-b0353104.pth`).
-  - Utilizes a highly optimized zero-shot mapping (`LABEL_KEYWORDS_ORDERED`) to translate ImageNet classes (e.g., "lab coat", "trench coat", "suit") to WardrobeAI specific categories (e.g., "shirt", "formal_pants").
-  - Evaluates an image within ~60ms.
-- **`app/ai/color_extractor.py`**:
-  - Deprecated edge-case prone BGR color ranges.
-  - Implemented CIELAB color space conversion combined with `scikit-learn`'s `KMeans++`.
-  - Added smart background separation using both Luminance (L*) and Saturation (S).
-  - Maps dominant centroids back to RGB/HSV to give accurate, perceptually precise human color names (covers 25+ named colors).
+## 1. `backend/app/ai/classifier.py`
 
-## 3. Thin Orchestrator Refactor
-- Rewrote `app/services/classifier_service.py` from 500+ lines of monolithic, spaghetti code down to ~120 lines.
-- It now operates as a clean "thin orchestrator":
-  - Takes in the image.
-  - Calls `classifier.classify_image()` for type.
-  - Calls `color_extractor.extract_colors()` for primary/secondary colors.
-  - Computes `occasion_tags` dynamically based on the specific style map and HSV formality.
-  - Exposes the exact same `analyze_clothing(image_path)` function signature, ensuring total drop-in backward compatibility with `app/routes/classify_routes.py`.
+- Added explicit success/failure signal (`ok` + `error`) in classifier responses.
+- Ensured `ALLOW_MODEL_DOWNLOAD=0` prevents remote TorchVision weight attempts when weights are not cached.
+- Preserved subtype-level `type` values and optional separate `category`.
+- Kept schema compatibility by adding fields without removing existing core ones.
 
-## 4. Unused/Dead Code Cleanup
-- Cleaned up bloated packages and outdated test files:
-  - Removed `tensorflow` dependency (~500MB waste).
-  - Deleted `model_loader.py` (referenced non-existent `.tflite` files).
-  - Deleted `image_preprocessor.py` (unused entirely).
-  - Deleted obsolete debug scripts: `debug_shirts.py`, `verify_classifier.py`, `test_hf_api.py`, `colors.txt`, etc.
+## 2. `backend/app/ai/color_extractor.py`
 
-## 5. Summary
-The classification pipeline is now reliable, incredibly fast, totally self-contained (works without the open internet), and extensible if a custom fine-tuned model (`app/ai/weights/clothing_classifier.pt`) is dropped into place later!
+- Removed fake successful gray fallback on unreadable image.
+- Added explicit failure payload (`ok: false`, `error`) for extraction failures.
+- Preserved successful behavior for valid images (`ok: true` + existing color fields).
+
+## 3. `backend/app/services/classifier_service.py`
+
+- Removed duplicate type-to-style mapping logic.
+- Aligned occasion tagging to classifier-provided style output.
+- Propagated optional `category` separately from `type`.
+- Added explicit pipeline failure output for route-level handling.
+
+## 4. `backend/app/services/outfit_service.py`
+
+- Updated slot grouping taxonomy constants to current subtype set.
+- Adjusted weather checks to current subtype values.
+- Preserved stored `type` values (no migration, no schema change).
+
+## 5. `backend/app/routes/classify_routes.py`
+
+- Added failure gate: rejects failed AI analysis with `422`.
+- Prevents saving placeholder classifier/color results.
+- Saves optional `category` as separate field.
+
+## 6. `frontend/src/pages/Wardrobe.jsx`
+
+- Added support for `semi-formal` style rendering.
+- Fixed stale config labels (`pyjama`, `loafers`).
+- Uses `category` as auxiliary metadata only (display/search), while subtype `type` remains primary for grouping.
+
+## 7. `backend/requirements.txt`
+
+- Normalized file encoding to UTF-8 (no UTF-16 BOM) to keep pip/runtime compatibility stable.
+- Kept package list intact (no removals).
+
+## 8. Documentation updates
+
+- `README.md`, `backend/how_it_works.md`, and this log now reflect:
+  - local classifier/color pipeline,
+  - download guard behavior,
+  - subtype `type` + optional `category` contract,
+  - route-level AI failure handling.

@@ -1,19 +1,13 @@
 """
 color_extractor.py — Perceptual colour extraction using CIELAB + KMeans++.
 
-Pipeline:
-  image path → OpenCV decode → resize 150×150
-  → BGR→LAB conversion → filter background pixels
-  → KMeans++(k=5) in LAB space → sort by cluster size
-  → convert dominant centroid to RGB + HSV
-  → map to human-readable colour name
-
-Uses CIELAB because it's perceptually uniform:
-  ΔE = √((ΔL*)² + (Δa*)² + (Δb*)²)
-  ΔE < 2 → indistinguishable to human eye
-
-Runs 100% locally, <50ms per image.
+Improved for wardrobe images:
+- type-aware focus crop
+- better background suppression
+- better dark-bottom handling
+- avoids calling neutral clothing "Silver" unless it is a watch
 """
+
 import cv2
 import numpy as np
 import colorsys
@@ -23,6 +17,25 @@ from sklearn.cluster import KMeans
 logger = logging.getLogger(__name__)
 
 K_CLUSTERS = 5
+
+TOP_TYPES = {"tshirt", "shirt", "formal_shirt", "hoodie", "sweater"}
+OUTERWEAR_TYPES = {"blazer", "jacket", "coat"}
+BOTTOM_TYPES = {"jeans", "formal_pants", "cargo_pants", "track_pants", "shorts", "skirt", "pyjama"}
+FOOTWEAR_TYPES = {"sneakers", "shoes", "loafers", "sandals", "slippers"}
+WATCH_TYPES = {"watch"}
+
+
+def _extraction_failure(reason: str, image_path: str):
+    return {
+        "ok": False,
+        "error": reason or "color_extraction_failed",
+        "image_path": image_path,
+        "primary_color": None,
+        "secondary_colors": [],
+        "primary_hsv": None,
+        "color_name": None,
+        "delta_e_spread": None,
+    }
 
 
 # ── Colour Space Conversions ──────────────────────────────────────
@@ -41,16 +54,56 @@ def _lab_to_rgb(l_val, a_val, b_val):
     return [int(r), int(g), int(b)]
 
 
-# ── Colour Naming (25+ named colours) ─────────────────────────────
+# ── Region Selection ──────────────────────────────────────────────
 
-def get_color_name(rgb):
+def _focus_crop(bgr, clothing_type=None):
+    """
+    Type-aware crop so color extraction focuses on the garment region
+    instead of background / skin / shirt / floor.
+    """
+    h, w = bgr.shape[:2]
+    clothing_type = (clothing_type or "").strip().lower()
+
+    if clothing_type in BOTTOM_TYPES:
+        # Focus on center-lower body, avoid too much torso/background
+        x1, x2 = int(w * 0.24), int(w * 0.76)
+        y1, y2 = int(h * 0.28), int(h * 0.96)
+    elif clothing_type in TOP_TYPES or clothing_type in OUTERWEAR_TYPES:
+        # Focus on torso/upper body
+        x1, x2 = int(w * 0.18), int(w * 0.82)
+        y1, y2 = int(h * 0.06), int(h * 0.74)
+    elif clothing_type in FOOTWEAR_TYPES:
+        # Focus on lower edge / feet region
+        x1, x2 = int(w * 0.18), int(w * 0.82)
+        y1, y2 = int(h * 0.68), int(h * 0.98)
+    elif clothing_type in WATCH_TYPES:
+        # Conservative center crop
+        x1, x2 = int(w * 0.28), int(w * 0.72)
+        y1, y2 = int(h * 0.20), int(h * 0.80)
+    else:
+        # Generic center crop
+        x1, x2 = int(w * 0.20), int(w * 0.80)
+        y1, y2 = int(h * 0.20), int(h * 0.80)
+
+    # Safety fallback
+    if x2 - x1 < 20 or y2 - y1 < 20:
+        return bgr
+    return bgr[y1:y2, x1:x2]
+
+
+# ── Colour Naming (clothing-aware) ────────────────────────────────
+
+def get_color_name(rgb, clothing_type=None):
     """
     Convert RGB to a human-readable colour name.
-    Uses HSV thresholds tuned for clothing detection.
+    Neutral apparel should usually be Gray / Charcoal / Black,
+    not Silver. Silver is mainly reserved for watches/metallic items.
     """
     r, g, b = rgb[0], rgb[1], rgb[2]
     h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
     h, s, v = h * 360, s * 100, v * 100
+
+    clothing_type = (clothing_type or "").strip().lower()
 
     # ── Achromatic colours ──
     if v < 15:
@@ -59,24 +112,27 @@ def get_color_name(rgb):
         return "Black"
     if v > 90 and s < 8:
         return "White"
-    if v > 80 and s < 12:
+    if v > 82 and s < 12:
         return "Off-White"
 
-    # Gray range (low saturation)
+    # Low-saturation neutrals
     if s < 12:
-        if v < 35:
+        if v < 38:
             return "Charcoal"
-        if v < 55:
+        if v < 60:
             return "Gray"
-        if v < 75:
+        # Only allow "Silver" for watch-like items
+        if clothing_type in WATCH_TYPES and v < 82:
             return "Silver"
+        if v < 82:
+            return "Light Gray"
         return "Light Gray"
 
     # ── Chromatic colours ──
     dark = v < 40
     light = v > 75 and s < 50
 
-    # Red family (0-15, 345-360)
+    # Red family
     if h < 8 or h >= 345:
         if dark:
             return "Maroon"
@@ -86,7 +142,7 @@ def get_color_name(rgb):
             return "Salmon"
         return "Red"
 
-    # Orange / Peach / Brown (8-40)
+    # Orange / Peach / Brown
     if h < 25:
         if dark:
             return "Brown"
@@ -95,6 +151,7 @@ def get_color_name(rgb):
         if s > 70:
             return "Orange"
         return "Orange"
+
     if h < 40:
         if dark:
             return "Brown"
@@ -102,19 +159,20 @@ def get_color_name(rgb):
             return "Beige"
         return "Orange"
 
-    # Yellow / Gold / Olive (40-70)
+    # Yellow / Gold / Olive
     if h < 55:
         if dark:
             return "Olive"
         if light:
             return "Cream"
         return "Yellow"
+
     if h < 70:
         if dark:
             return "Olive"
         return "Gold"
 
-    # Green family (70-160)
+    # Green family
     if h < 160:
         if dark:
             return "Dark Green"
@@ -126,7 +184,7 @@ def get_color_name(rgb):
             return "Green"
         return "Forest Green"
 
-    # Teal / Cyan (160-200)
+    # Teal / Cyan
     if h < 200:
         if dark:
             return "Teal"
@@ -134,11 +192,12 @@ def get_color_name(rgb):
             return "Mint"
         return "Cyan"
 
-    # Blue family (200-260)
+    # Blue family
     if h < 220:
         if dark:
             return "Navy"
         return "Blue"
+
     if h < 260:
         if dark:
             return "Navy"
@@ -146,7 +205,7 @@ def get_color_name(rgb):
             return "Royal Blue"
         return "Blue"
 
-    # Purple / Violet (260-290)
+    # Purple / Violet
     if h < 290:
         if dark:
             return "Dark Purple"
@@ -154,7 +213,7 @@ def get_color_name(rgb):
             return "Lavender"
         return "Purple"
 
-    # Pink / Magenta / Burgundy (290-345)
+    # Pink / Magenta / Burgundy
     if dark:
         return "Burgundy"
     if s < 30 and v > 70:
@@ -163,17 +222,101 @@ def get_color_name(rgb):
         if h < 320:
             return "Magenta"
         return "Hot Pink"
+
     return "Pink"
+
+
+# ── Cluster Selection Helpers ─────────────────────────────────────
+
+def _cluster_info(lab_center, count, total_count):
+    rgb = _lab_to_rgb(*lab_center)
+    h, s, v = _bgr_to_hsv_float(rgb[2], rgb[1], rgb[0])
+    rgb_range = max(rgb) - min(rgb)
+    brightness = sum(rgb) / 3.0
+    ratio = count / max(total_count, 1)
+
+    return {
+        "lab": lab_center,
+        "rgb": rgb,
+        "hsv": [h, s, v],
+        "count": int(count),
+        "ratio": float(ratio),
+        "range": float(rgb_range),
+        "brightness": float(brightness),
+        "is_bright_neutral": (s < 15 and brightness > 155),
+        "is_dark": brightness < 110,
+    }
+
+
+def _select_primary_cluster(cluster_infos, clothing_type=None):
+    """
+    Choose primary cluster more intelligently than 'largest cluster wins'.
+    Important for dark trousers, shoes, and other apparel with bright backgrounds.
+    """
+    if not cluster_infos:
+        return 0
+
+    clothing_type = (clothing_type or "").strip().lower()
+
+    # Default = dominant cluster
+    best_idx = 0
+    best_score = -1e9
+
+    for i, info in enumerate(cluster_infos):
+        h, s, v = info["hsv"]
+        ratio = info["ratio"]
+        brightness = info["brightness"]
+        color_range = info["range"]
+
+        # Base score favors large clusters
+        score = ratio * 100.0
+
+        # Penalize obvious bright neutral background
+        if info["is_bright_neutral"]:
+            score -= 35.0
+
+        # Slight reward for actual chroma
+        score += min(color_range, 70) * 0.15
+
+        # Type-aware adjustments
+        if clothing_type in BOTTOM_TYPES:
+            # Dark dominant colors are common for pants/jeans
+            if brightness < 120:
+                score += (120 - brightness) * 0.45
+
+            # Jeans often lean dark blue
+            if clothing_type == "jeans" and 185 <= h <= 255:
+                score += 12.0
+
+            # Large dark neutrals are often correct for trousers
+            if s < 18 and brightness < 95:
+                score += 10.0
+
+        elif clothing_type in FOOTWEAR_TYPES:
+            if brightness < 125:
+                score += (125 - brightness) * 0.35
+
+        else:
+            # Generic logic: avoid bright neutral background
+            if not info["is_bright_neutral"]:
+                score += 5.0
+
+        if score > best_score:
+            best_score = score
+            best_idx = i
+
+    return best_idx
 
 
 # ── Main Extraction ───────────────────────────────────────────────
 
-def extract_colors(image_path: str) -> dict:
+def extract_colors(image_path: str, clothing_type: str = None) -> dict:
     """
     Extract dominant colours from a clothing image using KMeans++ in CIELAB.
 
     Args:
         image_path: Path to the image file on disk.
+        clothing_type: Optional classifier output, e.g. jeans / shirt / shoes.
 
     Returns:
         {
@@ -181,57 +324,46 @@ def extract_colors(image_path: str) -> dict:
           "secondary_colors": [[r,g,b], ...],
           "primary_hsv":      [h, s, v],
           "color_name":       str,
-          "delta_e_spread":   float,  # palette diversity score
+          "delta_e_spread":   float,
         }
     """
     bgr = cv2.imread(image_path)
     if bgr is None:
         logger.warning(f"[color] Cannot read image: {image_path}")
-        return {
-            "primary_color": [128, 128, 128],
-            "secondary_colors": [],
-            "primary_hsv": [0, 0, 50],
-            "color_name": "Gray",
-            "delta_e_spread": 0.0,
-        }
+        return _extraction_failure("image_read_failed", image_path)
 
-    # Resize to 150×150 for speed — enough colour info retained
+    # Resize to keep color structure while staying fast
     bgr = cv2.resize(bgr, (150, 150), interpolation=cv2.INTER_AREA)
 
-    # ── Center crop (middle 60%) to focus on garment ──
-    h_img, w_img = bgr.shape[:2]
-    cy, cx = int(h_img * 0.2), int(w_img * 0.2)
-    bgr_crop = bgr[cy:h_img - cy, cx:w_img - cx]
+    # Type-aware crop
+    bgr_crop = _focus_crop(bgr, clothing_type)
 
-    # Convert BGR → CIELAB (float32 input required)
+    # Convert BGR → LAB
     bgr_f = bgr_crop.astype(np.float32) / 255.0
     lab = cv2.cvtColor(bgr_f, cv2.COLOR_BGR2LAB)
     pixels = lab.reshape(-1, 3)
 
-    # ── Filter background pixels ──
+    # Background suppression
     L = pixels[:, 0]
-    # L* < 5 = near-black background, L* > 97 = near-white background
-    fg_mask = (L > 5) & (L < 97)
+    fg_mask = (L > 4) & (L < 97)
 
-    # Also filter by saturation in HSV to remove gray backgrounds
     hsv_crop = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2HSV)
     hsv_pixels = hsv_crop.reshape(-1, 3)
     s_vals = hsv_pixels[:, 1]
     v_vals = hsv_pixels[:, 2]
 
-    # Neutral backgrounds: very low saturation + high brightness
-    not_neutral_bg = ~((s_vals < 15) & (v_vals > 180))
+    # Remove bright neutral background pixels
+    not_bright_neutral = ~((s_vals < 20) & (v_vals > 185))
+    not_extreme_white = v_vals < 248
 
-    combined_mask = fg_mask & not_neutral_bg
+    combined_mask = fg_mask & not_bright_neutral & not_extreme_white
     filtered = pixels[combined_mask]
 
-    # Fallback if too aggressive
     if len(filtered) < 100:
         filtered = pixels[fg_mask]
     if len(filtered) < 100:
         filtered = pixels
 
-    # ── KMeans++ in LAB space ──
     n_clusters = min(K_CLUSTERS, len(filtered))
     km = KMeans(
         n_clusters=n_clusters,
@@ -241,59 +373,42 @@ def extract_colors(image_path: str) -> dict:
     )
     km.fit(filtered)
 
-    # Sort clusters by count — largest = dominant colour
     counts = np.bincount(km.labels_)
     sorted_idx = np.argsort(-counts)
     centers = km.cluster_centers_[sorted_idx]
+    sorted_counts = counts[sorted_idx]
+    total_count = int(np.sum(sorted_counts))
 
-    # ── Smart primary selection ──
-    # If the largest cluster looks like background (neutral, bright),
-    # prefer the most saturated cluster as the garment colour
-    primary_lab = centers[0]
-    primary_rgb = _lab_to_rgb(*primary_lab)
-    p_max, p_min = max(primary_rgb), min(primary_rgb)
-    p_range = p_max - p_min
-    p_brightness = sum(primary_rgb) / 3
+    cluster_infos = [
+        _cluster_info(center, count, total_count)
+        for center, count in zip(centers, sorted_counts)
+    ]
 
-    if p_range < 30 and p_brightness > 150 and n_clusters > 1:
-        # Primary looks like background — find the real garment
-        best_idx = 0
-        best_score = -1
-        for i in range(min(n_clusters, len(centers))):
-            c_rgb = _lab_to_rgb(*centers[i])
-            c_range = max(c_rgb) - min(c_rgb)
-            c_brightness = sum(c_rgb) / 3
-            score = c_range + max(0, 200 - c_brightness)
-            if score > best_score:
-                best_score = score
-                best_idx = i
-        # Swap the best to position 0
-        centers_list = list(centers)
-        centers_list[0], centers_list[best_idx] = centers_list[best_idx], centers_list[0]
-        centers = np.array(centers_list)
+    primary_idx = _select_primary_cluster(cluster_infos, clothing_type)
 
-    # Convert top-3 LAB centroids → RGB
-    rgb_list = [_lab_to_rgb(*c) for c in centers[:3]]
+    # Reorder so chosen primary is first
+    ordered_infos = cluster_infos[:]
+    ordered_infos[0], ordered_infos[primary_idx] = ordered_infos[primary_idx], ordered_infos[0]
+
+    rgb_list = [info["rgb"] for info in ordered_infos[:3]]
     primary = rgb_list[0]
     secondary = rgb_list[1:] if len(rgb_list) > 1 else []
 
-    # Primary colour → HSV for harmony scoring
     pr, pg, pb = primary
-    hsv = _bgr_to_hsv_float(pb, pg, pr)  # _bgr_to_hsv expects B,G,R
+    hsv = _bgr_to_hsv_float(pb, pg, pr)
 
-    # Colour name
-    color_name = get_color_name(primary)
+    color_name = get_color_name(primary, clothing_type=clothing_type)
 
-    # Delta-E spread: how diverse the palette is
-    if len(centers) >= 2:
+    if len(ordered_infos) >= 2:
         delta_e = float(np.mean([
-            np.linalg.norm(centers[0] - centers[i])
-            for i in range(1, min(3, len(centers)))
+            np.linalg.norm(ordered_infos[0]["lab"] - ordered_infos[i]["lab"])
+            for i in range(1, min(3, len(ordered_infos)))
         ]))
     else:
         delta_e = 0.0
 
     return {
+        "ok": True,
         "primary_color": primary,
         "secondary_colors": secondary,
         "primary_hsv": hsv,

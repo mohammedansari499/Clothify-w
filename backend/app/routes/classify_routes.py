@@ -47,6 +47,24 @@ def classify_image():
         return jsonify({"error": error}), 400
 
     result = analyze_clothing(local_path)
+    if not result.get("ok"):
+        return (
+            jsonify(
+                {
+                    "error": result.get("error", "ai_analysis_failed"),
+                    "message": result.get(
+                        "message",
+                        "AI analysis failed. Please try a clearer image.",
+                    ),
+                    "details": {
+                        "classification": result.get("classification_details"),
+                        "color": result.get("color_details"),
+                    },
+                }
+            ),
+            422,
+        )
+
     clothing_item = {
         "user_id": current_user_id,
         "image_url": image_url,
@@ -61,6 +79,8 @@ def classify_image():
         "in_laundry": False,
         "created_at": datetime.utcnow(),
     }
+    if result.get("category"):
+        clothing_item["category"] = result["category"]
 
     insert_res = db.clothes_collection.insert_one(clothing_item)
     clothing_item["_id"] = str(insert_res.inserted_id)

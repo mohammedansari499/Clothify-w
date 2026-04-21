@@ -11,12 +11,12 @@ from datetime import datetime, timedelta
 from itertools import product as itertools_product
 
 
-# Map all clothing types to outfit slots
-TOP_TYPES = {"shirt", "tshirt", "formal_shirt", "hoodie", "sweater", "kurta", "sherwani", "blazer"}
-BOTTOM_TYPES = {"jeans", "formal_pants", "cargo_pants", "shorts", "track_pants", "pyjama", "pants", "skirt"}
-SHOE_TYPES = {"shoes", "sneakers", "loafers", "sandals", "slippers"}
-OUTERWEAR_TYPES = {"jacket", "coat", "blazer", "hoodie", "sweater"}
-ACCESSORY_TYPES = {"watch", "belt", "cap", "socks", "ring", "chain", "bracelet", "tie", "scarf", "bag", "accessories"}
+# Current classifier subtype taxonomy
+TOP_TYPES = {"tshirt", "shirt", "formal_shirt", "hoodie", "sweater"}
+BOTTOM_TYPES = {"jeans", "formal_pants", "cargo_pants", "track_pants", "shorts", "skirt", "pyjama"}
+SHOE_TYPES = {"sneakers", "shoes", "loafers", "sandals", "slippers"}
+OUTERWEAR_TYPES = {"blazer", "jacket", "coat"}
+ACCESSORY_TYPES = {"watch"}
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -298,21 +298,21 @@ def _is_weather_appropriate(item, weather_data):
     # Cold Weather (< 15°C)
     if temp < 15:
         # Avoid summer clothes in cold
-        if item_type in ["shorts", "sandals", "slippers", "tank_top", "skirt"]:
+        if item_type in {"shorts", "skirt", "sandals", "slippers"}:
             return False
             
     # Hot Weather (> 25°C)
     if temp > 25:
         # Avoid heavy winter clothes in heat
-        if item_type in ["heavy_coat", "boots", "thermal"]:
+        if item_type in {"coat", "blazer"}:
             return False
         # Hoodies and sweaters are okay if they are light, but heavily penalized
-        if item_type in ["hoodie", "sweater", "jacket"]:
+        if item_type in {"hoodie", "sweater", "jacket"}:
             return False
             
     # Rainy Weather
     if is_raining:
-        if item_type in ["suede_shoes", "canvas_shoes", "flip_flops"]:
+        if item_type in {"slippers"}:
             return False
             
     return True
@@ -587,3 +587,4 @@ def confirm_worn_outfit(user_id, item_ids):
         return {"success": True, "message": "Outfit marked as worn"}
     except Exception as e:
         return {"error": str(e)}
+

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { motion } from 'framer-motion';
 import {
   Bookmark,
   Calendar as CalendarIcon,
@@ -129,37 +129,73 @@ export default function Planner() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
-  const [occasions, setOccasions] = useState({
-    Monday: 'Work', Tuesday: 'Casual', Wednesday: 'Casual', Thursday: 'Casual',
-    Friday: 'Party', Saturday: 'Casual', Sunday: 'Casual',
+  const [occasions, setOccasions] = useState(() => {
+    const saved = localStorage.getItem('planner_occasions');
+
+    const defaults = {
+      Monday: 'Work',
+      Tuesday: 'Casual',
+      Wednesday: 'Casual',
+      Thursday: 'Casual',
+      Friday: 'Party',
+      Saturday: 'Casual',
+      Sunday: 'Casual',
+    };
+
+    if (saved) {
+      try {
+        return { ...defaults, ...JSON.parse(saved) };
+      } catch {
+        localStorage.removeItem('planner_occasions');
+      }
+    }
+
+    return defaults;
   });
 
   const today = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
+  const cityRef = useRef(city);
+  const occasionsRef = useRef(occasions);
+
+  useEffect(() => {
+    cityRef.current = city;
+  }, [city]);
+
+  useEffect(() => {
+    occasionsRef.current = occasions;
+  }, [occasions]);
 
   const fetchPlan = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      const currentCity = cityRef.current;
+      const currentOccasions = occasionsRef.current;
       const savedRes = await api.get('/outfits/plan/saved');
       if (savedRes.data.plan) {
         setPlan(savedRes.data.plan);
         setIsSavedPlan(true);
         if (savedRes.data.city) setCity(savedRes.data.city);
         if (savedRes.data.occasions) setOccasions(savedRes.data.occasions);
-        const weatherRes = await api.get('/weather/', { params: { city: savedRes.data.city || city } });
+        const weatherRes = await api.get('/weather/', {
+          params: { city: savedRes.data.city || currentCity },
+        });
         setWeather(weatherRes.data);
       } else {
-        const generated = await api.post('/outfits/plan', { city, occasions });
+        const generated = await api.post('/outfits/plan', {
+          city: currentCity,
+          occasions: currentOccasions,
+        });
         setPlan(generated.data.plan || []);
         setWeather(generated.data.weather_context || null);
         setIsSavedPlan(false);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load weekly plan.');
+      setError(err?.response?.data?.error || 'Failed to load weekly plan.');
     } finally {
       setLoading(false);
     }
-  }, [city, occasions]);
+  }, []); // ← IMPORTANT
 
   const fetchCalendarEvents = useCallback(async () => {
     try {
@@ -167,7 +203,7 @@ export default function Planner() {
       setCalendarEvents(res.data.events || []);
       setIsCalendarConnected(true);
     } catch (err) {
-      if (err.response?.status === 401 || err.response?.status === 404) {
+      if (err?.response?.status === 401 || err?.response?.status === 404) {
         setIsCalendarConnected(false);
       }
       setCalendarEvents([]);
@@ -175,20 +211,17 @@ export default function Planner() {
   }, []);
 
   useEffect(() => {
-    const savedOccasions = localStorage.getItem('planner_occasions');
-    if (savedOccasions) {
-      try {
-        const parsed = JSON.parse(savedOccasions);
-        setOccasions((prev) => ({ ...prev, ...parsed }));
-      } catch {
-        localStorage.removeItem('planner_occasions');
-      }
+    async function loadCalendarEvents() {
+      await fetchCalendarEvents();
     }
-    fetchCalendarEvents();
+    loadCalendarEvents();
   }, [fetchCalendarEvents]);
 
   useEffect(() => {
-    fetchPlan();
+    async function loadInitialPlan() {
+      await fetchPlan();
+    }
+    loadInitialPlan();
   }, [fetchPlan]);
 
   const handleGenerate = useCallback(async () => {
@@ -201,7 +234,7 @@ export default function Planner() {
       setPlan(res.data.plan || []);
       setWeather(res.data.weather_context || null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to generate new plan.');
+      setError(err?.response?.data?.error || 'Failed to generate new plan.');
     } finally {
       setLoading(false);
     }
@@ -230,7 +263,7 @@ export default function Planner() {
       const newOutfit = res.data.day_plan || res.data.outfit;
       setPlan((prev) => prev.map((p) => (p.day === day ? newOutfit : p)));
       setIsSavedPlan(false);
-    } catch (err) {
+    } catch {
       setError('Failed to update outfit for ' + day);
     }
   }, [city, occasions]);
@@ -250,7 +283,7 @@ export default function Planner() {
       const newOutfit = res.data.day_plan || res.data.outfit;
       setPlan((prev) => prev.map((p) => (p.day === day ? newOutfit : p)));
       setIsSavedPlan(false);
-    } catch (err) {
+    } catch {
       setError('Failed to regenerate outfit.');
     }
   }, [city, occasions, plan]);
@@ -280,7 +313,7 @@ export default function Planner() {
         }),
       );
       await api.post('/outfits/wear', { outfit: dayPlan });
-    } catch (err) {
+    } catch {
       setError('Failed to mark as worn.');
     }
   }, []);

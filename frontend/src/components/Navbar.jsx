@@ -115,7 +115,7 @@ export default function Navbar() {
                   to="/register"
                   className="px-6 py-2 bg-primary text-background rounded-xl font-bold text-[10px] tracking-widest hover:shadow-[0_0_20px_#00ff88] transition-all"
                 >
-                  INITIALIZE
+                  REGISTER
                 </Link>
                 <ThemeToggle />
               </div>

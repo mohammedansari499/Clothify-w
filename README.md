@@ -1,102 +1,602 @@
-# Clothify – AI Wardrobe System
+# 🧠 Clothify AI — Intelligent Digital Wardrobe System
 
-![Python](https://img.shields.io/badge/Python-3.10-blue)
-![Flask](https://img.shields.io/badge/Backend-Flask-black)
-![MongoDB](https://img.shields.io/badge/Database-MongoDB-green)
-![PyTorch](https://img.shields.io/badge/AI-PyTorch-ee4c2c)
-![React](https://img.shields.io/badge/Frontend-React-blue)
-![Vite](https://img.shields.io/badge/Bundler-Vite-646CFF)
-![Docker](https://img.shields.io/badge/Container-Docker-blue)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+<p align="center">
+  <strong>The Future of Wardrobe Intelligence. Engineered with AI, Computer Vision & Neural UI.</strong>
+</p>
 
-Clothify is a full-stack, AI-powered wardrobe intelligence application that allows users to organize clothing items, automatically classify garments using internal computer vision models, extract true clothing colors, and generate smart outfit plans manually or randomly.
-
-The system seamlessly combines **Flask REST APIs, PyTorch Machine Learning Models (MobileNetV2), Advanced KMeans Coloring (CIELAB Space), and modern React frontend interfaces**.
-
----
-
-# Key Features
-
-- **User Authentication:** Secure JWT-based Login & Registration.
-- **AI-Powered Image Classification:** Local PyTorch logic (MobileNetV2) instantly classifies clothing with no external API dependency.
-- **Accurate Color Extraction:** Translates RGB image pixels into CIELAB space and parses true dominant clothing color via KMeans Clustering.
-- **Digital Wardrobe:** Visually view, add, or delete your clothes. 
-- **Outfit Planner Engine:** Automatically generate stylish outfit combinations from your digitized wardrobe.
-- **Outfit Saving & Calendar Integration:** Save your favorite planned outfits and export them via Google Calendar API.
-- **Full Stack React SPA:** Blazing fast React app compiled using Vite with modern Tailwind CSS styling.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python"/>
+  <img src="https://img.shields.io/badge/Flask-Backend-black?style=for-the-badge&logo=flask"/>
+  <img src="https://img.shields.io/badge/PyTorch-Local%20AI-ee4c2c?style=for-the-badge&logo=pytorch"/>
+  <img src="https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react"/>
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite"/>
+  <img src="https://img.shields.io/badge/MongoDB-Database-green?style=for-the-badge&logo=mongodb"/>
+  <img src="https://img.shields.io/badge/TailwindCSS-UI-38B2AC?style=for-the-badge&logo=tailwindcss"/>
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge"/>
+</p>
 
 ---
 
-# System Architecture
+## 🌌 Overview
+
+Clothify is a **full-stack AI-powered wardrobe intelligence system** that turns clothing photos into a **structured, searchable, and style-aware digital wardrobe**.
+
+It combines:
+
+* 🧠 **Local Computer Vision** for garment recognition
+* 🎨 **Perceptual Color Intelligence** using CIELAB + KMeans
+* 👗 **Rule-based Outfit Planning** with scoring, variety, and weather context
+* ⚡ **Modern Animated UI** built with React, Tailwind CSS, and Framer Motion
+* 🔐 **User Accounts, Profiles, Collections, and Planner Persistence**
+
+At its core, Clothify is designed to:
+
+* ingest wardrobe images,
+* classify garments locally,
+* extract dominant colors,
+* tag items with wearable context,
+* generate weekly outfit plans,
+* persist wardrobe and planner data in MongoDB,
+* optionally connect Google Calendar to infer real-world occasions.
+
+> **Note:** some internal docs and legacy files still use the older name **WardrobeAI**. The active product identity in this repository is **Clothify AI**.
+
+---
+
+## 🌟 Key Features
+
+### 🔐 Authentication & User Identity
+
+* JWT-based authentication for protected API routes
+* Email/password registration and login
+* Google sign-in endpoint for OAuth-based login
+* Persistent frontend auth state via `AuthContext`
+* User profile retrieval and update support
+* Rich profile fields, including:
+  * name / display name
+  * username
+  * bio
+  * phone
+  * occupation
+  * location
+  * style preferences
+
+---
+
+### 👕 Digital Wardrobe Management
+
+* Drag-and-drop clothing image upload via React Dropzone
+* Secure backend upload handling for:
+  * `.jpg`
+  * `.jpeg`
+  * `.png`
+  * `.webp`
+* Uploaded files stored locally and served back through `/uploads/<filename>`
+* Clothing metadata persisted in MongoDB
+* Wardrobe CRUD operations:
+  * add item
+  * fetch all items
+  * delete item
+  * mark item as worn
+  * reset wear count
+* Frontend wardrobe view supports:
+  * grouped sections (Tops, Bottoms, Outerwear, Traditional, Dresses, Footwear, Accessories)
+  * search filtering
+  * wearable status tracking
+  * color chip previews
+  * quick action controls
+
+---
+
+### 🧠 Local AI Clothing Classification
+
+The AI path is primarily **local-first**.
+
+#### Primary classifier
+
+* Uses **PyTorch + TorchVision MobileNetV2**
+* Runs locally on the backend
+* Uses ImageNet-pretrained weights when no custom weights are present
+* Supports optional fine-tuned replacement weights from:
+  * `backend/app/ai/weights/clothing_classifier.pt`
+  * `backend/app/ai/weights/class_index.json`
+
+#### Clothing label mapping
+
+* Converts generic ImageNet outputs into wardrobe-oriented labels using an ordered remapping layer
+* Supports a broad taxonomy including categories such as:
+  * `tshirt`, `shirt`, `formal_shirt`
+  * `jacket`, `coat`, `hoodie`, `sweater`, `blazer`
+  * `jeans`, `formal_pants`, `cargo_pants`, `shorts`, `track_pants`, `pyjama`, `skirt`, `dress`
+  * `sneakers`, `loafers`, `shoes`, `sandals`, `slippers`
+  * `kurta`, `sherwani`
+  * `watch`, `belt`, `cap`, `socks`, `ring`, `chain`, `bracelet`, `tie`, `scarf`, `bag`, `accessories`
+
+#### Secondary verifier for ambiguous tops / outerwear
+
+* Includes a **CLIP-based zero-shot verifier** for difficult cases such as:
+  * jacket vs shirt
+  * jacket vs t-shirt
+  * shirt vs t-shirt
+* This verifier is auxiliary, not the primary classification backbone
+
+#### AI output payload
+
+Each classified item can include:
+
+* clothing type
+* predicted style
+* confidence score
+* top predictions
+* occasion tags
+* primary and secondary colors
+* human-readable color name
+
+---
+
+### 🎨 Advanced Color Extraction
+
+Color extraction is significantly more sophisticated than simple RGB averaging.
+
+* Reads the uploaded image with OpenCV
+* Resizes for faster processing
+* Center-crops the garment region to reduce background influence
+* Converts image data into **CIELAB color space**
+* Filters near-white, near-black, and low-information background pixels
+* Uses **KMeans++ clustering** in LAB space to identify dominant hues
+* Converts dominant colors back to RGB / HSV for downstream use
+* Maps dominant tones to human-readable names such as:
+  * Black, White, Gray, Silver
+  * Navy, Royal Blue, Teal, Green, Forest Green
+  * Beige, Brown, Cream, Gold, Olive
+  * Purple, Lavender, Pink, Red, Maroon, Salmon
+
+This pipeline is used both for display in the wardrobe UI and for outfit scoring logic.
+
+---
+
+### 🏷️ Style & Occasion Tagging
+
+After classification and color extraction, the backend derives wearable context automatically.
+
+* Style inference based on garment category
+* Occasion tagging using garment type and color formality
+* Example style buckets include:
+  * casual
+  * semi-formal
+  * formal
+  * traditional
+  * athletic
+  * accessory
+* Example occasion tags include:
+  * everyday
+  * office
+  * business
+  * festive
+  * wedding
+  * gym
+  * sports
+
+---
+
+### 👗 Smart Outfit Planning Engine
+
+Clothify includes a real planner engine rather than a shallow “random outfit” generator.
+
+#### Weekly plan generation
+
+* Generates a **7-day plan** from the current wardrobe
+* Works with sparse wardrobes and degrades gracefully if slots are missing
+* Supports occasion-aware planning per day
+
+#### Scoring logic
+
+* Groups clothing into outfit slots:
+  * tops
+  * bottoms
+  * footwear
+  * outerwear
+  * accessories
+* Uses RGB → HSL conversion for color harmony scoring
+* Rewards contrast, complementary pairings, and readable silhouettes
+* Penalizes high `wear_count` items to improve rotation
+* Adds variety penalties to reduce repeated combinations across the week
+
+#### Weather awareness
+
+* Filters outfit candidates using weather conditions when city context is provided
+* Can add outerwear when the weather is cold enough
+
+#### Laundry awareness
+
+* Supports `in_laundry` and laundry-threshold-aware planning logic
+* Applies laundry filtering only when enough clean inventory remains
+
+#### Planner UX features
+
+* save weekly plan
+* load saved plan
+* regenerate weekly plan
+* regenerate a single day’s outfit
+* replace current outfit suggestion for a given day
+* mark an outfit as worn
+* add generated outfits into collections
+* show confidence scores / suggested status / explanations
+
+---
+
+### ☁️ Weather Integration
+
+* Weather lookup service available through `/api/weather/`
+* Uses **OpenWeatherMap** when `OPENWEATHER_API_KEY` is configured
+* Falls back to mock weather data when the key is absent or the request fails
+* Used by the planner to make outfit suggestions more context-aware
+
+---
+
+### 📅 Google Calendar Integration
+
+Calendar support exists as an actual feature surface in both backend and frontend.
+
+* OAuth connect flow for Google Calendar
+* Stores Google credentials on the user document
+* Reads upcoming events from the user’s primary calendar
+* Maps calendar events to wardrobe occasions such as:
+  * Work
+  * Gym
+  * Wedding
+  * Formal Event
+  * Date
+  * Party
+  * Casual
+  * Home
+* Planner page can connect the calendar and pull event-derived context
+
+**Important implementation note:** the strongest implemented calendar path in this repo is **calendar connection + reading upcoming events for occasion inference**.
+
+---
+
+### 📂 Collections System
+
+* Create named collections
+* Save outfits into collections
+* Fetch all user collections
+* Delete collections
+* Remove individual saved outfits from a collection
+* Dedicated frontend page for browsing saved collections and outfits
+
+This makes the planner output reusable instead of disposable.
+
+---
+
+### 👤 Profile Management
+
+The repo includes a dedicated profile page and backend profile update support.
+
+Users can manage:
+
+* name
+* display name
+* username
+* bio
+* phone
+* occupation
+* location
+* style preferences
+* Google profile picture when applicable
+
+---
+
+### 🎨 Frontend Experience Layer
+
+The frontend is not plain CRUD.
+
+* React 19 + Vite application
+* Tailwind CSS with tokenized theming
+* Dark / light mode via `ThemeContext`
+* Framer Motion page transitions and animated UI states
+* Reusable UI primitives in `NeuralUI.jsx`
+* Animated landing page with branded “Clothify.AI” identity
+* Responsive navigation with auth-aware actions
+* Dedicated pages for:
+  * Home
+  * Login
+  * Register
+  * Wardrobe
+  * Planner
+  * Collections
+  * Profile
+
+The repository also contains extra experimental / design-forward components such as:
+
+* `CustomCursor.jsx`
+* `NeuralBackground.jsx`
+* `PageTransition.jsx`
+
+These reinforce the repo’s cyberpunk / neural aesthetic direction.
+
+---
+
+### 🧪 Testing, CI/CD & Dev Tooling
+
+#### Backend tests
+
+The repo includes pytest-based backend tests covering:
+
+* auth routes
+* file upload
+* classification pipeline behavior
+* clothes CRUD
+* outfit planning logic
+* color scoring math
+* calendar integration flow
+
+#### CI pipeline
+
+GitHub Actions workflows provide:
+
+* backend dependency install
+* flake8 linting
+* backend unit tests with coverage
+* coverage artifact upload
+* frontend lint/build
+* staging integration test run
+
+#### Deployment workflows
+
+* **Staging deploy:** Render backend + Vercel preview + smoke tests
+* **Production deploy:** approval gate + Render backend + Vercel production + post-deploy verification
+
+#### Additional developer tooling
+
+* MongoDB index bootstrap script: `backend/app/config/init_db.py`
+* Seed data script: `seed_test_data.py`
+* Docker Compose stack for local development
+* Postman workspace resources
+* Vercel configuration for SPA routing
+
+---
+
+## 🏗️ System Architecture
 
 ```text
-User 
+User
  │
  ▼
-Frontend Dashboard (React + Vite + Tailwind)
+Frontend SPA (React + Vite + Tailwind + Framer Motion)
+ │
+ ├── Authentication UI
+ ├── Wardrobe UI
+ ├── Planner UI
+ ├── Collections UI
+ └── Profile UI
  │
  ▼
 Flask Backend REST API
  │
- ├── Authentication Service (JWT)
- ├── Wardrobe Storage & Planning
- ├── Upload Handling & Routing
- └── External Integrations (Google Calendar OAuth)
+ ├── Auth Routes
+ ├── Upload Routes
+ ├── Classification Routes
+ ├── Clothes Routes
+ ├── Outfit Routes
+ ├── Weather Routes
+ ├── Calendar Routes
+ └── Collection Routes
  │
  ▼
-Local AI Classification Engine (PyTorch CPU)
+Local AI Engine
  │
- ├── Image Preprocessing & Crop Handling
- ├── MobileNetV2 Model + Internal Word Mapping 
- └── KMeans Clustering & CIELAB Extraction
+ ├── MobileNetV2 garment classifier
+ ├── Ordered label remapping layer
+ ├── Optional CLIP-based jacket/shirt verifier
+ └── CIELAB + KMeans color extractor
  │
  ▼
-MongoDB (NoSQL Document Store)
+MongoDB
+ │
+ ├── users
+ ├── clothes
+ ├── outfit_plans
+ └── collections
 ```
 
 ---
 
-# Project Structure
+## 🤖 AI Pipeline Deep Dive
 
 ```text
-Clothify-w
-│
-├ backend (Python / Flask)
-│  ├ app
-│  │  ├ ai             # PyTorch classification & CIELAB color extraction algorithms
-│  │  ├ config         # DB configuration and environmental loading
-│  │  ├ models         # MongoDB collection abstractions
-│  │  ├ routes         # API routing (auth, clothes, classify, outfit, calendar, upload)
-│  │  └ services       # Business logic (JWT flows, Outfit shuffling, Calendar Auth)
-│  ├ tests           
-│  ├ uploads           # Local storage for user clothes
-│  ├ app.py            # Flask Entry Point
-│  ├ requirements.txt  # Python Dependencies
-│  └ .env.example
-│
-├ frontend (Vite / React)
-│  ├ src
-│  │  ├ assets
-│  │  ├ components     # Reusable UI elements (Navbar, Cards, Modals)
-│  │  ├ context        # Global React Contexts (AuthContext)
-│  │  ├ pages          # Main Views (Home, Login, Register, Wardrobe, Planner)
-│  │  ├ App.jsx        # Main Router
-│  │  └ main.jsx       # React Entry point
-│  ├ public
-│  ├ package.json
-│  └ tailwind.config.js
-│
-├ how_to_start_it_whole.md  # Detailed Boot Guide
-└ README.md                 # Project Overview
+User uploads clothing image
+        ↓
+Backend stores file locally
+        ↓
+/api/classify resolves local upload path
+        ↓
+MobileNetV2 predicts garment class
+        ↓
+Ordered mapping converts ImageNet labels → wardrobe labels
+        ↓
+Optional CLIP verifier resolves ambiguous jacket/shirt/t-shirt cases
+        ↓
+CIELAB + KMeans extracts dominant color palette
+        ↓
+Style + occasion tags are synthesized
+        ↓
+Structured wardrobe item is saved to MongoDB
+        ↓
+Planner uses saved wardrobe metadata for scoring and generation
 ```
 
 ---
 
-# Installation & Getting Started
+## 🧮 Outfit Planning Logic
 
-Clothify runs two parallel dev-servers: a Python backend and a React/Vite frontend. 
+```text
+Wardrobe Items
+      ↓
+Slot Grouping (top / bottom / shoes / outerwear / accessories)
+      ↓
+Optional Weather Filter
+      ↓
+Optional Laundry Filter
+      ↓
+Color Harmony Scoring
+      ↓
+Wear Penalty + Variety Adjustment
+      ↓
+Occasion Mapping (Work / Casual / Party / Gym / etc.)
+      ↓
+Best Outfit Candidates Per Day
+      ↓
+Weekly Plan + Confidence + Explanation
+```
 
-## 1. Clone Repository
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+
+* React 19
+* Vite 8
+* Tailwind CSS
+* Framer Motion
+* React Router DOM
+* Axios
+* React Dropzone
+* Lucide React
+* React Icons
+* Google OAuth React SDK
+
+### Backend
+
+* Flask
+* Flask-CORS
+* Flask-JWT-Extended
+* MongoDB / PyMongo
+* bcrypt
+* python-dotenv
+* Google OAuth libraries
+* Requests
+
+### AI / ML
+
+* PyTorch
+* TorchVision
+* OpenCV
+* NumPy
+* scikit-learn
+* Pillow
+* Transformers (for the auxiliary CLIP verifier)
+
+### Infra / Tooling
+
+* GitHub Actions
+* Docker Compose
+* Vercel
+* Render
+* Postman
+* Pytest
+* Flake8
+
+---
+
+## 📁 Project Structure
+
+```text
+Clothify-w/
+│
+├── backend/
+│   ├── app.py                         # Flask entrypoint
+│   ├── requirements.txt              # Python dependencies
+│   ├── changes_log.md                # Classification engine change notes
+│   ├── how_it_works.md               # AI pipeline internals
+│   ├── app/
+│   │   ├── ai/
+│   │   │   ├── classifier.py         # MobileNetV2 + optional CLIP verification
+│   │   │   ├── color_extractor.py    # CIELAB + KMeans palette extraction
+│   │   │   └── jacket_verifier.py    # CLIP-based ambiguous-top resolver
+│   │   ├── config/
+│   │   │   ├── db.py                 # MongoDB collections
+│   │   │   └── init_db.py            # MongoDB index bootstrap
+│   │   ├── models/
+│   │   │   └── user_model.py         # User helpers
+│   │   ├── routes/
+│   │   │   ├── auth_routes.py
+│   │   │   ├── upload_routes.py
+│   │   │   ├── classify_routes.py
+│   │   │   ├── clothes_routes.py
+│   │   │   ├── outfit_routes.py
+│   │   │   ├── calendar_routes.py
+│   │   │   ├── weather_routes.py
+│   │   │   └── collection_routes.py
+│   │   └── services/
+│   │       ├── classifier_service.py
+│   │       ├── outfit_service.py
+│   │       ├── calendar_service.py
+│   │       └── weather_service.py
+│   ├── migrations/
+│   │   └── add_laundry_thresholds.py # Data migration for laundry thresholds
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_auth.py
+│       ├── test_calendar.py
+│       ├── test_classify.py
+│       ├── test_clothes.py
+│       ├── test_color_math.py
+│       ├── test_planner.py
+│       └── test_upload.py
+│
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── eslint.config.js
+│   ├── tailwind.config.js
+│   ├── vercel.json
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx
+│       ├── index.css
+│       ├── components/
+│       │   ├── Navbar.jsx
+│       │   ├── UploadDropzone.jsx
+│       │   ├── AddToCollectionModal.jsx
+│       │   ├── ThemeToggle.jsx
+│       │   ├── NeuralUI.jsx
+│       │   ├── PageTransition.jsx
+│       │   ├── CustomCursor.jsx
+│       │   └── NeuralBackground.jsx
+│       ├── context/
+│       │   ├── AuthContext.jsx
+│       │   └── ThemeContext.jsx
+│       ├── pages/
+│       │   ├── Home.jsx
+│       │   ├── Login.jsx
+│       │   ├── Register.jsx
+│       │   ├── Wardrobe.jsx
+│       │   ├── Planner.jsx
+│       │   ├── Collections.jsx
+│       │   └── Profile.jsx
+│       └── utils/
+│           └── axios.js
+│
+├── .github/workflows/
+│   ├── ci.yml
+│   ├── deploy-staging.yml
+│   └── deploy-production.yml
+│
+├── infrastructure/docker/
+│   └── docker-compose.yml
+│
+├── PROJECT_OVERVIEW.md
+├── seed_test_data.py
+└── README.md
+```
+
+---
+
+## 🚀 Installation & Setup
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/mohammedansari499/Clothify-w.git
@@ -105,135 +605,319 @@ cd "Clothify w"
 
 ---
 
-## 2. Start the Backend server
+### 2. Backend setup
 
-1. Open a terminal and navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-2. Create and active the python virtual environment:
-   - **Windows:**
-     ```bash
-     python -m venv venv
-     venv\Scripts\activate
-     ```
-   - **Mac/Linux:**
-     ```bash
-     python3 -m venv venv
-     source venv/bin/activate
-     ```
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Setup Environment Variables: 
-   - Rename `.env.example` to `.env`
-   - Fill in your `MONGO_URI` (MongoDB connection string) and set a secure `JWT_SECRET_KEY`.
-5. Start the backend app server:
-   ```bash
-   flask run
-   # OR
-   python app.py
-   ```
-   *The server will be running cleanly on `http://localhost:5000`*
+#### Create and activate a virtual environment
 
----
+**Windows (PowerShell)**
 
-## 3. Start the Frontend Web App
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
 
-1. Open a **second distinct terminal** leaving the previous backend terminal running.
-2. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-3. Install NodeJS dependencies:
-   ```bash
-   npm install
-   ```
-4. Start the Vite React development server:
-   ```bash
-   npm run dev
-   ```
-5. Click the local URL printed in your console (usually `http://localhost:5173`) to launch the visual interface!
+**macOS / Linux**
 
----
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-# API Endpoints Summary
+#### Configure environment variables
 
-## Authentication (`/api/auth/*`)
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/register` | Register user |
-| POST | `/login` | Login user |
-| GET | `/profile` | Get current user profile (JWT Restricted) |
+Create `backend/.env` and define the values used by the codebase:
 
-## Wardrobe & Upload (`/api/clothes/*`, `/api/upload`)
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/clothes` | Create and save a new clothing item to DB |
-| GET | `/api/clothes` | Get user's wardrobe list |
-| DELETE| `/api/clothes/<id>` | Delete an item |
-| POST | `/api/upload` | Specialized pipeline for image binary uploading |
+```env
+MONGO_URI=mongodb://localhost:27017/wardrobeai
+SECRET_KEY=your_app_secret
+JWT_SECRET_KEY=your_jwt_secret
+FRONTEND_URL=http://localhost:5173
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/calendar/callback
+OPENWEATHER_API_KEY=your_openweather_api_key
+UPLOAD_FOLDER=uploads
+FLASK_DEBUG=false
+```
 
-## AI Processing & Outfits (`/api/classify`, `/api/outfits/*`)
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/classify` | Takes an image, runs PyTorch MobileNetV2 & extracts CIELAB color |
-| GET | `/api/outfits/plan` | Generate outfit plans from the user's available wardrobe |
-| POST | `/api/outfits/plan/save` | Push an optimal outfit into saved plan memory |
-| GET | `/api/outfits/plan/saved` | Retrieve previously saved plans |
+#### Optional: initialize MongoDB indexes
 
-## Extensibility (`/api/calendar/connect`)
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/calendar/connect`| Oauth redirect to export plans to Google Calendar |
+```bash
+python app/config/init_db.py
+```
 
----
+#### Run the backend
 
-# AI Pipeline Deep-Dive
+```bash
+python app.py
+```
 
-We replaced heavy third-party APIs or external models with a purely localized, fast-executing machine learning architecture.
+The backend will be available at:
 
 ```text
-       User Uploads Photo
-               ↓
-    Image Cleaning & Resizing
-               ↓
-  PyTorch + MobileNetV2 Network
-  (Internal Weighted Inference)
-               ↓
- Dictionary Translation Mapping 
- (e.g. Lab Coat -> Formal Wear)
-               ↓
- KMeans Clustering & Filter Scan
- (Ignores BG, Whites, Edge Noise)
-               ↓
-    CIELAB Color Space Mapping
-               ↓
- Outputs Category & Hex Palette
-      to Frontend Instantly
+http://127.0.0.1:5000
 ```
 
 ---
 
-# Implementation Status
+### 3. Frontend setup
 
-- [x] **Phase 1 – Backend Core:** Flask API, JWT, MongoDB integration, Wardrobe CRUD.
-- [x] **Phase 2 – Advanced Local AI:** PyTorch MobileNetV2 loading, Image preprocessing, CIELAB Extraction.
-- [x] **Phase 3 – Frontend Interfaces:** React UI, Wardrobe Dashboard, Interactive Uploads, Outfit Planner Views.
-- [x] **Phase 4 – Advanced Features:** Intelligent Outfit Shuffling algorithms, Google Calendar Exports.
-- [ ] **Phase 5 – Mobile Application:** React Native / Expo implementation (Coming Soon).
-- [ ] **Phase 6 – DevOps Infrastructure:** Cloud Deployment orchestration.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Optional frontend environment values:
+
+```env
+VITE_API_URL=http://127.0.0.1:5000/api
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+```
+
+The frontend will typically run at:
+
+```text
+http://localhost:5173
+```
 
 ---
 
-# Author
+### 4. Seed demo data (optional)
+
+From the repo root:
+
+```bash
+python seed_test_data.py
+```
+
+This inserts sample users / clothes / collections for quick UI testing.
+
+---
+
+## 🐳 Docker Development Stack
+
+A Docker Compose setup is included for local development.
+
+```bash
+cd infrastructure/docker
+docker-compose up --build
+```
+
+This stack includes:
+
+* MongoDB container
+* Flask backend container
+* mounted backend source for local iteration
+
+---
+
+## 📡 API Surface
+
+### Authentication
+
+* `POST /api/auth/register`
+* `POST /api/auth/login`
+* `POST /api/auth/google`
+* `GET /api/auth/profile`
+* `PUT /api/auth/profile`
+
+### Upload & Classification
+
+* `POST /api/upload/`
+* `POST /api/classify/`
+
+### Wardrobe
+
+* `POST /api/clothes/`
+* `GET /api/clothes/`
+* `DELETE /api/clothes/<item_id>`
+* `PATCH /api/clothes/<item_id>/wear`
+* `PATCH /api/clothes/<item_id>/reset-wear`
+
+### Outfit Planner
+
+* `GET /api/outfits/plan`
+* `POST /api/outfits/plan`
+* `POST /api/outfits/plan/save`
+* `GET /api/outfits/plan/saved`
+* `POST /api/outfits/plan/day`
+* `POST /api/outfits/wear`
+
+### Collections
+
+* `GET /api/collections/`
+* `POST /api/collections/`
+* `POST /api/collections/<collection_id>/add`
+* `DELETE /api/collections/<collection_id>`
+* `DELETE /api/collections/<collection_id>/outfit/<outfit_index>`
+
+### Weather
+
+* `GET /api/weather/`
+
+### Calendar
+
+* `GET /api/calendar/connect`
+* `GET /api/calendar/callback`
+* `GET /api/calendar/events`
+
+---
+
+## ⚡ Runtime & Behavior Notes
+
+* Backend preloads the model stack on startup to reduce first-request latency
+* If custom classifier weights are absent, MobileNetV2 ImageNet weights are used
+* The CLIP verifier is only used for ambiguous top / outerwear cases
+* Uploads are stored locally, not in a required external media service
+* Weather calls fall back to mock data if OpenWeatherMap is unavailable
+* Planner logic is robust enough to handle incomplete wardrobes
+* The frontend stores some planner and theme preferences in local storage
+
+---
+
+## 🧪 Testing & Quality Gates
+
+### Backend test suites
+
+The repository includes tests for:
+
+* authentication flows
+* upload route validation
+* color extraction fallbacks
+* classification return shape
+* outfit score math
+* weekly plan generation
+* calendar OAuth flow scaffolding
+* clothes route serialization and deletion logic
+
+### CI behavior
+
+`ci.yml` runs:
+
+* backend install
+* flake8 linting
+* pytest with coverage
+* frontend install
+* frontend lint
+* frontend build
+
+### Deployment workflows
+
+* `deploy-staging.yml`
+  * triggers CI
+  * deploys backend to Render staging
+  * deploys frontend preview to Vercel
+  * runs smoke tests
+* `deploy-production.yml`
+  * triggers CI
+  * requires approval
+  * deploys backend to Render production
+  * deploys frontend to Vercel production
+  * runs post-deploy verification
+
+---
+
+## 🛠 Implementation Status
+
+* [x] Flask backend with modular blueprints
+* [x] JWT auth + Google login endpoint
+* [x] Local upload pipeline
+* [x] Local AI classification pipeline
+* [x] Color extraction with CIELAB + KMeans
+* [x] MongoDB wardrobe persistence
+* [x] Wear tracking and planner persistence
+* [x] Weekly outfit planner
+* [x] Weather-aware planning
+* [x] Google Calendar connection + event reading
+* [x] Collections management
+* [x] Profile editing UI + backend update route
+* [x] Tailwind + Framer Motion frontend
+* [x] Dark / light theme support
+* [x] Backend tests
+* [x] CI/CD workflows
+* [x] Docker local stack
+* [ ] Mobile app
+* [ ] Fine-tuned production clothing model bundled in-repo
+* [ ] Fully polished screenshot gallery in README
+* [ ] Advanced AI stylist / conversational recommendation layer
+
+---
+
+## 🗺️ Practical Next Steps
+
+If you continue improving this repo, the most valuable next upgrades are:
+
+1. replace generic ImageNet mapping with a fine-tuned garment classifier,
+2. formalize the backend `.env.example`,
+3. add real screenshots / gifs to this README,
+4. harden Google Calendar scopes and callback behavior,
+5. wire any experimental UI components globally only if they are intended to ship,
+6. add stronger integration tests for planner + calendar + weather flows.
+
+---
+
+## 📸 Screenshots
+
+Replace this section with real UI captures from:
+
+* Home page
+* Wardrobe page
+* Planner page
+* Collections page
+* Profile page
+
+Example layout:
+
+| Dashboard | Wardrobe | Planner |
+|---|---|---|
+| `docs/screenshots/home.png` | `docs/screenshots/wardrobe.png` | `docs/screenshots/planner.png` |
+
+---
+
+## 📚 Additional Project Docs
+
+Useful companion documents already present in the repository snapshot:
+
+* `PROJECT_OVERVIEW.md`
+* `backend/how_it_works.md`
+* `backend/changes_log.md`
+* `seed_test_data.py`
+
+---
+
+## 👨‍💻 Author
 
 **Mohammed Abdul Wahaj Ansari**
-
-GitHub: [https://github.com/mohammedansari499](https://github.com/mohammedansari499)
+GitHub: https://github.com/mohammedansari499
 
 ---
 
 ## 📜 License
-This project is licensed under the MIT License — see the LICENSE file for details.
+
+MIT License
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome in areas such as:
+
+* model quality improvements
+* wardrobe taxonomy refinement
+* planner intelligence
+* frontend polish and accessibility
+* testing depth
+* deployment hardening
+* documentation cleanup
+
+If you contribute, keep these principles intact:
+
+* preserve local-first AI behavior where possible,
+* avoid reintroducing weak heuristic shortcuts where the repo already has better logic,
+* keep the backend modular,
+* keep the UI theme coherent with the current Clothify identity.

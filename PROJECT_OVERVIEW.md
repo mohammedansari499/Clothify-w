@@ -1,6 +1,7 @@
 # WardrobeAI Project Overview & Architecture Guide
 
-Welcome to WardrobeAI! This document explains the full-stack architecture of the platform, detailing how the React frontend, Python Flask backend, and the local AI models communicate to create a complete smart wardrobe system.
+Welcome to Clothify! 
+This document explains the full-stack architecture of the platform, detailing how the React frontend, Python Flask backend, and the local AI models communicate to create a complete smart wardrobe system.
 
 ---
 

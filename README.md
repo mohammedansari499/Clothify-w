@@ -60,6 +60,10 @@ At its core, Clothify is designed to:
   * occupation
   * location
   * style preferences
+  * available in both dark and light theme
+  
+<img width="1138" height="574" alt="image" src="https://github.com/user-attachments/assets/a8acba5a-4741-4ba1-919c-bbcdbf4be20a" />
+<img width="1149" height="582" alt="image" src="https://github.com/user-attachments/assets/3b6ba075-7f25-492d-bd0d-ca6db0e43a98" />
 
 ---
 
@@ -71,6 +75,8 @@ At its core, Clothify is designed to:
   * `.jpeg`
   * `.png`
   * `.webp`
+ <img width="1135" height="579" alt="image" src="https://github.com/user-attachments/assets/0686622c-a59f-4f9d-a05a-b4b32d50470e" />
+
 * Uploaded files stored locally and served back through `/uploads/<filename>`
 * Clothing metadata persisted in MongoDB
 * Wardrobe CRUD operations:
@@ -111,6 +117,9 @@ The AI path is primarily **local-first**.
   * `sneakers`, `loafers`, `shoes`, `sandals`, `slippers`
   * `kurta`, `sherwani`
   * `watch`, `belt`, `cap`, `socks`, `ring`, `chain`, `bracelet`, `tie`, `scarf`, `bag`, `accessories`
+
+<img width="1131" height="570" alt="image" src="https://github.com/user-attachments/assets/6dedd155-6dbb-4394-a881-1d3dcd0a917a" />
+
 
 #### Secondary verifier for ambiguous tops / outerwear
 
@@ -202,10 +211,16 @@ Clothify includes a real planner engine rather than a shallow â€œrandom outfitâ€
 * Penalizes high `wear_count` items to improve rotation
 * Adds variety penalties to reduce repeated combinations across the week
 
+<img width="1118" height="573" alt="image" src="https://github.com/user-attachments/assets/5c7d0467-48b7-4aeb-ba8f-110e2e0e8298" />
+
+
 #### Weather awareness
 
 * Filters outfit candidates using weather conditions when city context is provided
 * Can add outerwear when the weather is cold enough
+
+<img width="1108" height="562" alt="image" src="https://github.com/user-attachments/assets/a26ff80e-fb1b-4cca-833e-0ddaa33188ad" />
+
 
 #### Laundry awareness
 
@@ -265,6 +280,8 @@ Calendar support exists as an actual feature surface in both backend and fronten
 * Remove individual saved outfits from a collection
 * Dedicated frontend page for browsing saved collections and outfits
 
+<img width="1134" height="573" alt="image" src="https://github.com/user-attachments/assets/8f72a47b-a50d-4397-846c-0a28cb62de61" />
+
 This makes the planner output reusable instead of disposable.
 
 ---
@@ -306,6 +323,7 @@ The frontend is not plain CRUD.
   * Planner
   * Collections
   * Profile
+
 
 The repository also contains extra experimental / design-forward components such as:
 

@@ -68,6 +68,7 @@ export default function Home() {
   const blob2Y = useTransform(smooth, [0, 1], [0, -100]);
 
   /* scroll-cue fades out after first scroll */
+  // eslint-disable-next-line no-unused-vars
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const unsub = scrollYProgress.on("change", (v) => {
@@ -173,9 +174,9 @@ export default function Home() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
 
-            <div className="grid lg:grid-cols-2 min-h-[520px]">
+            <div className="min-h-[520px] flex items-center justify-center">
               {/* left: copy */}
-              <div className="relative z-10 p-10 md:p-14 flex flex-col justify-center">
+              <div className="relative z-10 p-10 md:p-14 flex flex-col items-center justify-center text-center w-full max-w-2xl mx-auto">
                 <h2 className="text-5xl font-black tracking-tighter leading-none mb-6 text-text">
                   Your outfit,
                   <br />
@@ -184,12 +185,12 @@ export default function Home() {
                   </span>
                 </h2>
 
-                <p className="text-text-muted leading-relaxed mb-10 max-w-sm text-base font-medium">
+                <p className="text-text-muted leading-relaxed mb-10 max-w-md mx-auto text-base font-medium">
                   Tell us the vibe, the weather, the occasion — Clothify handles
                   the rest, pulling from pieces you already own and love.
                 </p>
 
-                <div className="grid grid-cols-2 gap-3 mb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10 w-full max-w-xl">
                   {[
                     { label: "Smart Matching", sub: "Color & fabric harmony" },
                     { label: "Context Aware", sub: "Weather + occasion fit" },
@@ -218,59 +219,7 @@ export default function Home() {
               </div>
 
               {/* right: visual panel */}
-              <div className="relative overflow-hidden bg-darker rounded-r-[2.5rem]">
-                <motion.img
-                  src="/uploads/wp9337752-dark-neon-wallpapers.JPG"
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-50"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 1.4, ease: "easeOut" }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-darker via-darker/30 to-transparent" />
-
-                {/* scanning line */}
-                <div className="absolute inset-0 pointer-events-none border border-primary/10 m-5 rounded-2xl overflow-hidden">
-                  <motion.div
-                    animate={{ y: ["0%", "100%"] }}
-                    transition={{
-                      duration: 5,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="w-full h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent blur-sm"
-                  />
-                </div>
-
-                {/* floating HUD chips */}
-                <div className="relative z-10 h-full flex flex-col justify-between p-8">
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                    viewport={{ once: true }}
-                    className="self-end flex flex-col gap-2 items-end"
-                  >
-                    <Chip>🌤 19°C · Casual</Chip>
-                    <Chip>Analyzing fit…</Chip>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.55 }}
-                    viewport={{ once: true }}
-                  >
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">
-                      Recommended
-                    </p>
-                    <h3 className="text-5xl font-black tracking-tighter text-text italic leading-none">
-                      Linen
-                      <br />
-                      Summer <span className="text-primary">Edit</span>
-                    </h3>
-                  </motion.div>
-                </div>
-              </div>
+              
             </div>
           </div>
         </motion.div>
@@ -321,7 +270,7 @@ export default function Home() {
               {/* same card style as Login's container */}
               <div className="h-full bg-card backdrop-blur-xl p-8 rounded-[2rem] border border-border-subtle shadow-[0_10px_30px_rgba(0,0,0,0.35)] relative overflow-hidden group hover:border-primary/30 transition-all duration-500">
                 <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 blur-3xl rounded-full pointer-events-none group-hover:bg-primary/10 transition-all duration-700" />
-
+                
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-8">
                     <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary">

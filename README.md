@@ -843,54 +843,40 @@ The repository includes tests for:
 * [x] Docker local stack
 * [ ] Mobile app
 * [ ] Fine-tuned production clothing model bundled in-repo
-* [ ] Fully polished screenshot gallery in README
 * [ ] Advanced AI stylist / conversational recommendation layer
 
 ---
 
-## 🗺️ Practical Next Steps
-
-If you continue improving this repo, the most valuable next upgrades are:
-
-1. replace generic ImageNet mapping with a fine-tuned garment classifier,
-2. formalize the backend `.env.example`,
-3. add real screenshots / gifs to this README,
-4. harden Google Calendar scopes and callback behavior,
-5. wire any experimental UI components globally only if they are intended to ship,
-6. add stronger integration tests for planner + calendar + weather flows.
-
----
-
 ## 📸 Screenshots
+
 
 <img width="1149" height="582" alt="image" src="https://github.com/user-attachments/assets/2a16cc77-9907-4175-b5fd-43823f43e62a" />
 <img width="1150" height="580" alt="image" src="https://github.com/user-attachments/assets/77a62642-8c9a-423f-bfa3-595f2aa79a6b" />
 
 * Home page
 
+
 <img width="1160" height="585" alt="image" src="https://github.com/user-attachments/assets/916a6050-b33f-4f15-81e6-3a9f36bd6755" />
 <img width="1101" height="554" alt="image" src="https://github.com/user-attachments/assets/fc1f2c4d-5c1c-46af-80b7-5ae492769f4f" />
 
 * Wardrobe page
+
 
 <img width="1119" height="567" alt="image" src="https://github.com/user-attachments/assets/8b310187-9372-4101-8d4f-a02481adb6fd" />
 <img width="1109" height="558" alt="image" src="https://github.com/user-attachments/assets/3459fcd2-2cc1-454f-8e14-bb7010577640" />
 
 * Planner page
 
+
 <img width="1103" height="554" alt="image" src="https://github.com/user-attachments/assets/90bf6dd2-bb1c-4f79-afce-e35b90d5207a" />
 
 * Collections page
+
 
 <img width="1492" height="786" alt="image" src="https://github.com/user-attachments/assets/e50d6cd7-9050-40c2-8a9d-20e11b320b40" />
 
 * Profile page
 
-Example layout:
-
-| Dashboard | Wardrobe | Planner |
-|---|---|---|
-| `docs/screenshots/home.png` | `docs/screenshots/wardrobe.png` | `docs/screenshots/planner.png` |
 
 ---
 
